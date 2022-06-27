@@ -1,6 +1,41 @@
+#ifndef CT_ICP_ODOMETRY_HPP
+#define CT_ICP_ODOMETRY_HPP
 #include "odometry.h"
 
 namespace ct_icp {
+    Odometry::Odometry(const OdometryOptions& options) {
+        options_ = options;
+        // Update the motion compensation
+        switch (options_.motion_compensation) {
+        case MOTION_COMPENSATION::NONE:
+        case MOTION_COMPENSATION::CONSTANT_VELOCITY:
+            // ElasticICP does not compensate the motion
+            options_.ct_icp_options.point_to_plane_with_distortion = false;
+            options_.ct_icp_options.distance = POINT_TO_PLANE;
+            break;
+        case MOTION_COMPENSATION::ITERATIVE:
+            // ElasticICP compensates the motion at each ICP iteration
+            options_.ct_icp_options.point_to_plane_with_distortion = true;
+            options_.ct_icp_options.distance = POINT_TO_PLANE;
+            break;
+        case MOTION_COMPENSATION::CONTINUOUS:
+            // ElasticICP compensates continuously the motion
+            options_.ct_icp_options.point_to_plane_with_distortion = true;
+            options_.ct_icp_options.distance = CT_POINT_TO_PLANE;
+            break;
+        }
+        next_robust_level_ = options.robust_minimal_level;
+
+        if (options_.log_to_file) {
+            log_file_ = std::make_unique<std::ofstream>(options_.log_file_destination.c_str(),
+                std::ofstream::trunc);
+            log_out_ = log_file_.get();
+            *log_out_ << "Debug Print ?" << options_.debug_print << std::endl;
+        }
+        else
+            log_out_ = &std::cout;
+    }
+
     const auto compute_frame_info = [](const std::vector<double> timestamps, auto registered_fid) {
         Odometry::FrameInfo frame_info;
         auto begin = timestamps.cbegin();
@@ -12,10 +47,11 @@ namespace ct_icp {
         return frame_info;
     };
 
-    Odometry::RegistrationSummary Odometry::RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame, const std::vector<double>& timestamps) {
-        auto frame_info = compute_frame_info(timestamps, registered_frames_++);
+    void Odometry::RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame, const std::vector<double>& timestamp_vector) {
+        auto frame_info = compute_frame_info(timestamp_vector, registered_frames_++);
         InitializeMotion(frame_info, nullptr);
-        return DoRegister(frame, frame_info);
+        cout << 
+        return;
     }
 
     void Odometry::InitializeMotion(FrameInfo frame_info, const TrajectoryFrame* initial_estimate) {
@@ -77,3 +113,4 @@ namespace ct_icp {
         }
     }
 }
+#endif
