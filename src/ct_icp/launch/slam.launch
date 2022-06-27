@@ -1,0 +1,4 @@
+<launch>
+  <rosparam command="load" file="$(find ct_icp)/config/default_config.yaml" />
+  <node pkg="ct_icp" type="slam" name="slam" output="screen"></node>
+</launch>
