@@ -18,7 +18,7 @@ std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
 const std::string main_frame_id = "/Odometry";
 const std::string child_frame_id = "/child";
 
-struct Options{
+struct Options {
     ct_icp::OdometryOptions odometry_options;
     std::string lidar_topic = "/center/pandar";
     int max_num_threads = 1; // The maximum number of threads running in parallel the Dataset acquisition
@@ -97,14 +97,21 @@ Options get_options(ros::NodeHandle nh) {
 }
 
 void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
-    std::lock_guard<std::mutex> guard{registration_mutex};
+    std::lock_guard<std::mutex> guard{ registration_mutex };
 
     pcl::PointCloud<pandar_ros::Point> pcl_pc2;
     pcl::fromROSMsg(*input, pcl_pc2);
-    
-    double stamp = (double) pcl_pc2.header.stamp;
-    
-    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2);
+
+    double stamp = (double)pcl_pc2.header.stamp;
+
+    // add timestamp fields to double vector
+    std::vector<double> timestamp_vec;
+    for (int i = 0; i < pcl_pc2.size(); i++) {
+        double timestamp = pcl_pc2.points[i].timestamp;
+        timestamp_vec.push_back(timestamp);
+    }
+
+    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
 }
 
 int main(int argc, char** argv) {
