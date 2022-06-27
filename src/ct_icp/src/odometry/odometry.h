@@ -1,14 +1,11 @@
 #ifndef CT_ICP_ODOMETRY_H
 #define CT_ICP_ODOMETRY_H
 
-#include <map>
 #include "../cost_functions/cost_func.h"
 #include "../utils/types.h"
 
 #include <iostream>
 #include <string>
-#include <sstream>
-#include <iomanip>
 #include <list>
 #include <pcl/point_cloud.h>
 
@@ -17,9 +14,7 @@
 #include <fstream>
 #include <vector>
 #include <random>
-#include <unordered_map>
 
-#include <Eigen/Dense>
 
 
 namespace ct_icp {
@@ -246,7 +241,7 @@ namespace ct_icp {
         explicit Odometry(const OdometryOptions& options);
 
         // Registers a new Frame to the Map
-        RegistrationSummary RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame, const std::vector<double>& timestamp_vector);
+        void RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame, const std::vector<double>& timestamp_vector);
 
         // Registers a new Frame to the Map with an initial estimate
         RegistrationSummary RegisterFrameWithEstimate(const std::vector<Point3D>& frame,

@@ -29,6 +29,15 @@ namespace pandar_ros {
         std::uint16_t ring;
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
+
+    struct WPoint3D {
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        Point raw_point;
+        Eigen::Vector3d w_point;
+        int frame_index = -1;
+
+        WPoint3D() = default;
+    };
 }
 POINT_CLOUD_REGISTER_POINT_STRUCT(pandar_ros::Point,
     (float, x, x)
@@ -40,6 +49,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(pandar_ros::Point,
 )
 
 namespace slam {
+
     struct SE3 {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
         Eigen::Quaternion<double> quat = Eigen::Quaternion<double>::Identity();
@@ -53,7 +63,7 @@ namespace slam {
 
         inline SE3 Inverse() const;
         inline Eigen::Matrix<double, 4, 4> Matrix() const;
-        inline Eigen::Matrix<double, 3, 3> RotationMatrix() const;
+        inline Eigen::Matrix<double, 3, 3> Rotation() const;
         inline Eigen::Transform<double, 3, Eigen::Isometry> Isometry() const;
 
         inline double& operator[](size_t param_idx);
@@ -73,6 +83,17 @@ namespace slam {
         // Returns a random transformation
         static SE3 Random(double tr_scale = 1.0, double quat_scale = 1.0);
     };
+
+    inline double AngularDistance(const Eigen::Matrix<double, 3, 3>& R1, const Eigen::Matrix<double, 3, 3>& R2) {
+        double norm = ((R1 * R2.transpose()).trace() - 1.0) / 2.0;
+        norm = ceres::fmax(ceres::fmin(norm, 1.0), -1.0);
+        norm = ceres::acos(norm) * double(180.0 / M_PI);
+        return norm;
+    }
+
+    inline double AngularDistance(const SE3 &lhs, const SE3 &rhs) {
+        return AngularDistance(lhs.Rotation(), rhs.Rotation());
+    }
 
     struct Pose {
         SE3 pose;
@@ -97,18 +118,50 @@ namespace slam {
                 ref_frame_id,
                 ref_timestamp) {}
 
+        double GetAlphaTimestamp(double mid_timestamp, const Pose &other) const {
+            double min_timestamp = std::min(dest_timestamp, other.dest_timestamp);
+            double max_timestamp = std::max(dest_timestamp, other.dest_timestamp);
+
+            if (min_timestamp > mid_timestamp) return 0.0;
+            if (max_timestamp < mid_timestamp) return 0.0;
+            if (min_timestamp == max_timestamp) return 1.0;
+            return (mid_timestamp - min_timestamp) / (max_timestamp - min_timestamp);
+        }
+
+        [[nodiscard]] Eigen::Matrix<double, 3, 1> ContinuousTransform(const Eigen::Matrix<double, 3, 1> &relative_point,
+                                                const Pose &other_pose, double timestamp) const;
+
+        [[nodiscard]] Pose InterpolatePoseAlpha(const Pose &other_pose, double alpha_timestamp,
+                                                    int new_dest_frame_id = -1) const;
+
+        [[nodiscard]] Pose InterpolatePose(const Pose &other_pose, double timestamp,
+                                               int new_dest_frame_id = -1) const;
+
+        [[nodiscard]] Eigen::Matrix<double, 4, 4> Matrix() const;
+        [[nodiscard]] Eigen::Transform<double, 3, Eigen::Isometry> Isometry() const;
+        [[nodiscard]] Pose Inverse() const;
+        Pose operator*(const Pose &rhs) const;
+        Eigen::Matrix<double, 3, 1> operator*(const Eigen::Matrix<double, 3, 1> &point) const;
+
+        Pose static Identity();
+        Pose static Identity(double t, int frame_id);
+
+        inline const Eigen::Quaternion<double> &QuatConstRef() const { return pose.quat; }
+
+        inline Eigen::Matrix<double, 3, 1> &TrRef() { return pose.tr; }
+
+        inline const Eigen::Matrix<double, 3, 1> &TrConstRef() const { return pose.tr; }
+
+        inline Eigen::Matrix<double, 3, 3> Rotation() const { return QuatConstRef().normalized().toRotationMatrix(); }
+
+        double AngularDistance(const Pose& other) const {
+            return slam::AngularDistance(pose, other.pose);
+        }
+
+        double LocationDistance(const Pose& other) const {
+            return (TrConstRef() - other.TrConstRef()).norm();
+        }
     };
-
-    inline double AngularDistance(const Eigen::Matrix<double, 3, 3>& R1, const Eigen::Matrix<double, 3, 3>& R2) {
-        double norm = ((R1 * R2.transpose()).trace() - 1.0) / 2.0;
-        norm = ceres::fmax(ceres::fmin(norm, 1.0), -1.0);
-        norm = ceres::acos(norm) * double(180.0 / M_PI);
-        return norm;
-    }
-
-    inline double AngularDistance(const SE3 &lhs, const SE3 &rhs) {
-        return AngularDistance(lhs.RotationMatrix(), rhs.RotationMatrix());
-    }
 }
 
 namespace ct_icp {
@@ -137,7 +190,16 @@ namespace ct_icp {
         slam::Pose begin_pose, end_pose;
 
         inline double EgoAngularDistance() const {
-            return slam::AngularDistance
+            return slam::AngularDistance(begin_pose.pose, end_pose.pose);
+        }
+
+        double TranslationDistance(const TrajectoryFrame &other) {
+            return (begin_pose.TrConstRef() - other.begin_pose.TrConstRef()).norm() + 
+                (end_pose.TrConstRef() - other.end_pose.TrConstRef()).norm();
+        }
+
+        double RotationDistance(const TrajectoryFrame &other) {
+            return begin_pose.AngularDistance(other.begin_pose) + end_pose.AngularDistance(other.end_pose);
         }
     };
 

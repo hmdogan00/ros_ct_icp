@@ -1,12 +1,6 @@
-#include <iostream>
-#include <string>
+
 #include <mutex>
 #include <thread>
-
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <pcl/PCLPointCloud2.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 #include "odometry/odometry.h"
 
@@ -102,8 +96,6 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     pcl::PointCloud<pandar_ros::Point> pcl_pc2;
     pcl::fromROSMsg(*input, pcl_pc2);
 
-    double stamp = (double)pcl_pc2.header.stamp;
-
     // add timestamp fields to double vector
     std::vector<double> timestamp_vec;
     for (int i = 0; i < pcl_pc2.size(); i++) {
@@ -111,7 +103,8 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
         timestamp_vec.push_back(timestamp);
     }
 
-    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    // ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
 }
 
 int main(int argc, char** argv) {
@@ -120,6 +113,8 @@ int main(int argc, char** argv) {
 
     // Parameter registration
     Options options = get_options(nh);
+
+    odometry_ptr = std::make_unique<ct_icp::Odometry>(options.odometry_options);
 
     ros::Subscriber sub_pcl = nh.subscribe(options.lidar_topic, 200000, pcl_cb);
     while (ros::ok()) {
