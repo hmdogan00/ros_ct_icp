@@ -11,7 +11,10 @@
 #include "odometry/odometry.h"
 
 int init, motion, dist, ls, solver, weight;
+
+int frame_id = 0;
 std::mutex registration_mutex;
+std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
 const std::string main_frame_id = "/Odometry";
 const std::string child_frame_id = "/child";
 
@@ -98,8 +101,10 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
 
     pcl::PointCloud<pandar_ros::Point> pcl_pc2;
     pcl::fromROSMsg(*input, pcl_pc2);
-    std::cout << pcl_pc2 << std::endl;
-    auto stamp = pcl_pc2.header.stamp;
+    
+    double stamp = (double) pcl_pc2.header.stamp;
+    
+    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2);
 }
 
 int main(int argc, char** argv) {

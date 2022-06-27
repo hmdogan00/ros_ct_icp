@@ -63,7 +63,7 @@ find_package(tsl-robin-map REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
-catkin_package()
+catkin_package( CATKIN_DEPENDS )
 
 include_directories( ${catkin_INCLUDE_DIRS} )
 
@@ -96,8 +96,10 @@ include_directories( ${catkin_INCLUDE_DIRS} )
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
+add_library(odometry src/odometry/odometry.cpp)
 
 add_executable(slam src/slam.cpp)
+add_dependencies(slam odometry)
 target_link_libraries(slam PUBLIC Ceres::ceres Eigen3::Eigen OpenMP::OpenMP_CXX tsl::robin_map ${catkin_LIBRARIES})
 
 #############

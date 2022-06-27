@@ -3,12 +3,14 @@
 
 #include <map>
 #include "../cost_functions/cost_func.h"
+#include "../utils/types.h"
 
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <iomanip>
 #include <list>
+#include <pcl/point_cloud.h>
 
 #define _USE_MATH_DEFINES
 
@@ -19,7 +21,6 @@
 
 #include <Eigen/Dense>
 
-#include "../utils/types.h"
 
 namespace ct_icp {
 
@@ -49,8 +50,8 @@ namespace ct_icp {
   };
 
   enum WEIGHTING_SCHEME {
-    PLANARITY ,      // Weighs residuals by their planarity coefficient
-    NEIGHBORHOOD ,   // Weighs residuals by the distance to their neares neighbors
+    PLANARITY,      // Weighs residuals by their planarity coefficient
+    NEIGHBORHOOD,   // Weighs residuals by the distance to their neares neighbors
     ALL          // Combines all weighting schemes with different coefficients
   };
 
@@ -204,7 +205,11 @@ namespace ct_icp {
 
   class Odometry {
     public:
-
+    struct FrameInfo {
+      int registered_fid = -1; // The index of the new frame (since the initial insertion of the frame)
+      int frame_id = -1; // The frame index
+      double begin_timestamp = -1., end_timestamp = -1.;
+    };
     // The Output of a registration, including metrics,
     struct RegistrationSummary {
 
@@ -240,10 +245,8 @@ namespace ct_icp {
 
     explicit Odometry(const OdometryOptions& options);
 
-    explicit Odometry(const OdometryOptions* options) : Odometry(*options) {}
-
     // Registers a new Frame to the Map
-    RegistrationSummary RegisterFrame(const std::vector<Point3D>& frame);
+    RegistrationSummary RegisterFrame(const pcl::PointCloud<pandar_ros::Point> &frame);
 
     // Registers a new Frame to the Map with an initial estimate
     RegistrationSummary RegisterFrameWithEstimate(const std::vector<Point3D>& frame,
@@ -287,7 +290,7 @@ namespace ct_icp {
       double sample_voxel_size);
 
     // Insert a New Trajectory Frame, and initializes the motion for this new frame
-    int InitializeMotion(const TrajectoryFrame* initial_estimate = nullptr);
+    void InitializeMotion(FrameInfo frame_info, const TrajectoryFrame* initial_estimate = nullptr);
 
     // Try to insert Points to the map
     // Returns false if it fails

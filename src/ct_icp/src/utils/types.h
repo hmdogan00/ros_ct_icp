@@ -14,6 +14,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl/PCLPointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 #define _USE_MATH_DEFINES
 
