@@ -97,14 +97,19 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     pcl::fromROSMsg(*input, pcl_pc2);
 
     // add timestamp fields to double vector
+    auto stamp = pcl_pc2.header.stamp;
     std::vector<double> timestamp_vec;
     for (int i = 0; i < pcl_pc2.size(); i++) {
-        double timestamp = pcl_pc2.points[i].timestamp;
+        double timestamp = std::fmod(pcl_pc2.points[i].timestamp, 100);
         timestamp_vec.push_back(timestamp);
     }
 
-    // ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
-    odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+
+    // slam::SE3 p = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec)[frame_id].begin_pose.pose;
+    // std::cout << "qw qx qy qz tx ty tz\n" << std::endl;
+    // std::cout << p.quat.w() << " " << p.quat.x() << " " << p.quat.y() << " " << p.quat.z() << " " << p.tr.x() << " " << p.tr.y() << " " << p.tr.z() << std::endl;
+    frame_id++;
 }
 
 int main(int argc, char** argv) {

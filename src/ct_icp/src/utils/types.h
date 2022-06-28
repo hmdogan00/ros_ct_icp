@@ -28,6 +28,16 @@ namespace pandar_ros {
         double timestamp;
         std::uint16_t ring;
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+            Point& operator=(const Point& other) {
+            x = other.x;
+            y = other.y;
+            z = other.z;
+            intensity = other.intensity;
+            timestamp = other.timestamp;
+            ring = other.ring;
+            return *this;
+        }
     };
 
     struct WPoint3D {
@@ -37,6 +47,13 @@ namespace pandar_ros {
         int frame_index = -1;
 
         WPoint3D() = default;
+
+        WPoint3D& operator =(const Point& other) {
+            raw_point = other;
+            w_point = Eigen::Vector3d(raw_point.x, raw_point.y, raw_point.z);
+            frame_index = -1;
+            return *this;
+        }
     };
 }
 POINT_CLOUD_REGISTER_POINT_STRUCT(pandar_ros::Point,
@@ -61,20 +78,20 @@ namespace slam {
 
         SE3(const Eigen::Quaternion<double>& quat, const Eigen::Matrix<double, 3, 1>& tr) : quat(quat.normalized()), tr(tr) {}
 
-        inline SE3 Inverse() const;
+        SE3 Inverse() const;
         inline Eigen::Matrix<double, 4, 4> Matrix() const;
-        inline Eigen::Matrix<double, 3, 3> Rotation() const;
+        Eigen::Matrix<double, 3, 3> Rotation() const;
         inline Eigen::Transform<double, 3, Eigen::Isometry> Isometry() const;
 
         inline double& operator[](size_t param_idx);
         inline const double& operator[](size_t param_idx) const;
 
         //Right hand side matrix SE3 multiplication
-        inline SE3 operator*(const SE3& rhs) const;
+        SE3 operator*(const SE3& rhs) const;
 
         // Given a raw 3D point 'x' captured from a LiDAR sensor at pose 'P'
         // coordinates of 'x' in the world frame is given by 'P * x'
-        inline Eigen::Matrix<double, 3, 1> operator*(const Eigen::Matrix<double, 3, 1>& x) const;
+        Eigen::Matrix<double, 3, 1> operator*(const Eigen::Matrix<double, 3, 1>& x) const;
 
         SE3 Interpolate(const SE3& other, double weight) const;
 
@@ -91,7 +108,7 @@ namespace slam {
         return norm;
     }
 
-    inline double AngularDistance(const SE3 &lhs, const SE3 &rhs) {
+    inline double AngularDistance(const SE3& lhs, const SE3& rhs) {
         return AngularDistance(lhs.Rotation(), rhs.Rotation());
     }
 
@@ -118,7 +135,7 @@ namespace slam {
                 ref_frame_id,
                 ref_timestamp) {}
 
-        double GetAlphaTimestamp(double mid_timestamp, const Pose &other) const {
+        double GetAlphaTimestamp(double mid_timestamp, const Pose& other) const {
             double min_timestamp = std::min(dest_timestamp, other.dest_timestamp);
             double max_timestamp = std::max(dest_timestamp, other.dest_timestamp);
 
@@ -128,29 +145,29 @@ namespace slam {
             return (mid_timestamp - min_timestamp) / (max_timestamp - min_timestamp);
         }
 
-        [[nodiscard]] Eigen::Matrix<double, 3, 1> ContinuousTransform(const Eigen::Matrix<double, 3, 1> &relative_point,
-                                                const Pose &other_pose, double timestamp) const;
+        [[nodiscard]] Eigen::Matrix<double, 3, 1> ContinuousTransform(const Eigen::Matrix<double, 3, 1>& relative_point,
+            const Pose& other_pose, double timestamp) const;
 
-        [[nodiscard]] Pose InterpolatePoseAlpha(const Pose &other_pose, double alpha_timestamp,
-                                                    int new_dest_frame_id = -1) const;
+        [[nodiscard]] Pose InterpolatePoseAlpha(const Pose& other_pose, double alpha_timestamp,
+            int new_dest_frame_id = -1) const;
 
-        [[nodiscard]] Pose InterpolatePose(const Pose &other_pose, double timestamp,
-                                               int new_dest_frame_id = -1) const;
+        [[nodiscard]] Pose InterpolatePose(const Pose& other_pose, double timestamp,
+            int new_dest_frame_id = -1) const;
 
         [[nodiscard]] Eigen::Matrix<double, 4, 4> Matrix() const;
         [[nodiscard]] Eigen::Transform<double, 3, Eigen::Isometry> Isometry() const;
         [[nodiscard]] Pose Inverse() const;
-        Pose operator*(const Pose &rhs) const;
-        Eigen::Matrix<double, 3, 1> operator*(const Eigen::Matrix<double, 3, 1> &point) const;
+        Pose operator*(const Pose& rhs) const;
+        Eigen::Matrix<double, 3, 1> operator*(const Eigen::Matrix<double, 3, 1>& point) const;
 
         Pose static Identity();
         Pose static Identity(double t, int frame_id);
 
-        inline const Eigen::Quaternion<double> &QuatConstRef() const { return pose.quat; }
+        inline const Eigen::Quaternion<double>& QuatConstRef() const { return pose.quat; }
 
-        inline Eigen::Matrix<double, 3, 1> &TrRef() { return pose.tr; }
+        inline Eigen::Matrix<double, 3, 1>& TrRef() { return pose.tr; }
 
-        inline const Eigen::Matrix<double, 3, 1> &TrConstRef() const { return pose.tr; }
+        inline const Eigen::Matrix<double, 3, 1>& TrConstRef() const { return pose.tr; }
 
         inline Eigen::Matrix<double, 3, 3> Rotation() const { return QuatConstRef().normalized().toRotationMatrix(); }
 
@@ -165,18 +182,6 @@ namespace slam {
 }
 
 namespace ct_icp {
-    // A Point3D
-    struct Point3D {
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-            Eigen::Vector3d raw_pt; // Raw point read from the sensor
-        Eigen::Vector3d pt; // Corrected point taking into account the motion of the sensor during frame acquisition
-        double alpha_timestamp = 0.0; // Relative timestamp in the frame in [0.0, 1.0]
-        double timestamp = 0.0; // The absolute timestamp (if applicable)
-        int index_frame = -1; // The frame index
-
-        Point3D() = default;
-    };
 
     inline double AngularDistance(const Eigen::Matrix3d& rota,
         const Eigen::Matrix3d& rotb) {
@@ -193,14 +198,22 @@ namespace ct_icp {
             return slam::AngularDistance(begin_pose.pose, end_pose.pose);
         }
 
-        double TranslationDistance(const TrajectoryFrame &other) {
-            return (begin_pose.TrConstRef() - other.begin_pose.TrConstRef()).norm() + 
+        double TranslationDistance(const TrajectoryFrame& other) {
+            return (begin_pose.TrConstRef() - other.begin_pose.TrConstRef()).norm() +
                 (end_pose.TrConstRef() - other.end_pose.TrConstRef()).norm();
         }
 
-        double RotationDistance(const TrajectoryFrame &other) {
+        double RotationDistance(const TrajectoryFrame& other) {
             return begin_pose.AngularDistance(other.begin_pose) + end_pose.AngularDistance(other.end_pose);
         }
+        
+        inline const Eigen::Vector3d &BeginTr() const { return begin_pose.TrConstRef(); }
+
+        inline const Eigen::Quaterniond &BeginQuat() const { return begin_pose.QuatConstRef(); }
+
+        inline const Eigen::Vector3d &EndTr() const { return end_pose.TrConstRef(); }
+
+        inline const Eigen::Quaterniond &EndQuat() const { return end_pose.QuatConstRef(); }
     };
 
 
@@ -250,16 +263,16 @@ namespace ct_icp {
 
         inline int Capacity() { return num_points_; }
 
-    private:
+        private:
         int num_points_;
     };
 
+    void sub_sample_frame(std::vector<pandar_ros::WPoint3D> &frame, double size_voxel);
 
     typedef tsl::robin_map<Voxel, VoxelBlock> VoxelHashMap;
 
 
 } // namespace Elastic_ICP
-
 
 // Specialization of std::hash for our custom type Voxel
 namespace std {
@@ -277,8 +290,8 @@ namespace std {
             const size_t kP3 = 83492791;
             return vox.x * kP1 + vox.y * kP2 + vox.z * kP3;
 #endif
-    }
-};
+        }
+    };
 }
 
 #endif //CT_ICP_TYPES_HPP
