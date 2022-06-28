@@ -188,24 +188,3 @@ namespace slam {
         return data;
     }
 }
-
-namespace ct_icp {
-    void sub_sample_frame(std::vector<pandar_ros::WPoint3D>& frame, double size_voxel) {
-        std::unordered_map<Voxel, std::vector<pandar_ros::WPoint3D>> grid;
-        for (int i = 0; i < (int)frame.size(); i++) {
-            auto kx = static_cast<short>(frame[i].raw_point.x / size_voxel);
-            auto ky = static_cast<short>(frame[i].raw_point.y / size_voxel);
-            auto kz = static_cast<short>(frame[i].raw_point.z / size_voxel);
-            grid[Voxel(kx, ky, kz)].push_back(frame[i]);
-        }
-        frame.resize(0);
-        int step = 0; //to take one random point inside each voxel (but with identical results when lunching the SLAM a second time)
-        for (const auto& n : grid) {
-            if (n.second.size() > 0) {
-                //frame.push_back(n.second[step % (int)n.second.size()]);
-                frame.push_back(n.second[0]);
-                step++;
-            }
-        }
-    }
-}

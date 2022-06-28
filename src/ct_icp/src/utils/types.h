@@ -163,6 +163,8 @@ namespace slam {
         Pose static Identity();
         Pose static Identity(double t, int frame_id);
 
+        inline Eigen::Quaternion<double> &QuatRef() { return pose.quat; }
+
         inline const Eigen::Quaternion<double>& QuatConstRef() const { return pose.quat; }
 
         inline Eigen::Matrix<double, 3, 1>& TrRef() { return pose.tr; }
@@ -266,8 +268,6 @@ namespace ct_icp {
         private:
         int num_points_;
     };
-
-    void sub_sample_frame(std::vector<pandar_ros::WPoint3D> &frame, double size_voxel);
 
     typedef tsl::robin_map<Voxel, VoxelBlock> VoxelHashMap;
 

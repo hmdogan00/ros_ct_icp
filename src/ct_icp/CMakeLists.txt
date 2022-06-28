@@ -97,7 +97,7 @@ include_directories( ${catkin_INCLUDE_DIRS} )
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(slam src/slam.cpp src/odometry/odometry.cpp src/utils/types.cpp)
+add_executable(slam src/slam.cpp src/odometry/odometry.cpp src/utils/types.cpp src/ct_icp/ct_icp.cpp src/cost_functions/cost_func.cpp)
 target_link_libraries(slam PUBLIC Ceres::ceres Eigen3::Eigen OpenMP::OpenMP_CXX tsl::robin_map ${catkin_LIBRARIES})
 
 #############

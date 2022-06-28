@@ -7,9 +7,9 @@ namespace ct_icp {
         return ::ct_icp::MapSize(voxel_map_);
     }
 
-    void DistortFrame(std::vector<pandar_ros::WPoint3D> &points, const slam::Pose &begin, const slam::Pose &end){
+    void DistortFrame(std::vector<pandar_ros::WPoint3D>& points, const slam::Pose& begin, const slam::Pose& end) {
         slam::SE3 end_inverse = end.Inverse().pose;
-        for (pandar_ros::WPoint3D &point: points){
+        for (pandar_ros::WPoint3D& point : points) {
             auto interpolated = begin.InterpolatePose(end, point.raw_point.timestamp).pose;
             Eigen::Vector3d v = end_inverse * (interpolated * Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z));
             point.raw_point.x = v(0);
@@ -18,34 +18,34 @@ namespace ct_icp {
         }
     }
 
-    inline void TransformPoint(MOTION_COMPENSATION comp, pandar_ros::WPoint3D p, const slam::Pose &begin, const slam::Pose &end){
+    inline void TransformPoint(MOTION_COMPENSATION comp, pandar_ros::WPoint3D p, const slam::Pose& begin, const slam::Pose& end) {
         slam::SE3 pose = end.pose;
         switch (comp) {
-            case MOTION_COMPENSATION::NONE:
-            case MOTION_COMPENSATION::CONSTANT_VELOCITY:
-                break;
-            case MOTION_COMPENSATION::CONTINUOUS:
-            case MOTION_COMPENSATION::ITERATIVE:
-                pose = begin.InterpolatePose(end, p.raw_point.timestamp).pose;
-                break;
+        case MOTION_COMPENSATION::NONE:
+        case MOTION_COMPENSATION::CONSTANT_VELOCITY:
+            break;
+        case MOTION_COMPENSATION::CONTINUOUS:
+        case MOTION_COMPENSATION::ITERATIVE:
+            pose = begin.InterpolatePose(end, p.raw_point.timestamp).pose;
+            break;
         }
         p.w_point = pose * Eigen::Vector3d(p.raw_point.x, p.raw_point.y, p.raw_point.z);
     }
-    
-    void AddPointToMap(VoxelHashMap &map, const Eigen::Vector3d &point, double voxel_size,
-                            int max_num_points_in_voxel, double min_distance_points, int min_num_points = 0) {
+
+    void AddPointToMap(VoxelHashMap& map, const Eigen::Vector3d& point, double voxel_size,
+        int max_num_points_in_voxel, double min_distance_points, int min_num_points = 0) {
         short kx = static_cast<short>(point[0] / voxel_size);
         short ky = static_cast<short>(point[1] / voxel_size);
         short kz = static_cast<short>(point[2] / voxel_size);
 
         VoxelHashMap::iterator search = map.find(Voxel(kx, ky, kz));
         if (search != map.end()) {
-            auto &voxel_block = (search.value());
+            auto& voxel_block = (search.value());
 
             if (!voxel_block.IsFull()) {
                 double sq_dist_min_to_points = 10 * voxel_size * voxel_size;
                 for (int i(0); i < voxel_block.NumPoints(); ++i) {
-                    auto &_point = voxel_block.points[i];
+                    auto& _point = voxel_block.points[i];
                     double sq_dist = (_point - point).squaredNorm();
                     if (sq_dist < sq_dist_min_to_points) {
                         sq_dist_min_to_points = sq_dist;
@@ -57,7 +57,7 @@ namespace ct_icp {
                     }
                 }
             }
-        } 
+        }
         else {
             if (min_num_points <= 0) {
                 // Do not add points (avoids polluting the map)
@@ -71,30 +71,30 @@ namespace ct_icp {
     void AddPointsToMap(VoxelHashMap& map, const std::vector<pandar_ros::WPoint3D>& points,
         double voxel_size, int max_num_points_in_voxel,
         double min_distance_points, int min_num_points) {
-        for (const auto &point: points) {
+        for (const auto& point : points) {
             AddPointToMap(map, point.w_point, voxel_size, max_num_points_in_voxel, min_distance_points,
-                          min_num_points);
+                min_num_points);
         }
     }
 
-    void RemovePointsFarFromLocation(VoxelHashMap &map, const Eigen::Vector3d &location, double distance) {
+    size_t MapSize(const VoxelHashMap& map) {
+        size_t map_size(0);
+        for (auto& itr_voxel_map : map) {
+            map_size += (itr_voxel_map.second).NumPoints();
+        }
+        return map_size;
+    }
+
+    void RemovePointsFarFromLocation(VoxelHashMap& map, const Eigen::Vector3d& location, double distance) {
         std::vector<Voxel> voxels_to_erase;
-        for (auto &pair: map) {
+        for (auto& pair : map) {
             Eigen::Vector3d pt = pair.second.points[0];
             if ((pt - location).squaredNorm() > (distance * distance)) {
                 voxels_to_erase.push_back(pair.first);
             }
         }
-        for (auto &vox: voxels_to_erase)
+        for (auto& vox : voxels_to_erase)
             map.erase(vox);
-        }
-
-        size_t MapSize(const VoxelHashMap &map) {
-            size_t map_size(0);
-            for (auto &itr_voxel_map: map) {
-                map_size += (itr_voxel_map.second).NumPoints();
-            }
-            return map_size;
     }
 
     Odometry::Odometry(const OdometryOptions& options) {
@@ -205,9 +205,9 @@ namespace ct_icp {
         }
     }
 
-    std::vector<pandar_ros::WPoint3D> Odometry::InitializeFrame(const pcl::PointCloud<pandar_ros::Point>& const_frame, Odometry::FrameInfo frame_info){
+    std::vector<pandar_ros::WPoint3D> Odometry::InitializeFrame(const pcl::PointCloud<pandar_ros::Point>& const_frame, Odometry::FrameInfo frame_info) {
         double sample_size = frame_info.registered_fid < options_.init_num_frames ?
-                            options_.init_voxel_size : options_.voxel_size;
+            options_.init_voxel_size : options_.voxel_size;
         std::vector<pandar_ros::WPoint3D> frame(const_frame.size());
         for (int i = 0; i < frame.size(); i++) {
             frame[i] = const_frame[i];
@@ -221,8 +221,8 @@ namespace ct_icp {
         ct_icp::sub_sample_frame(frame, sample_size);
 
         // no icp first time (because no ego motion)
-        if (k_index_frame <= 1){
-            for (pandar_ros::WPoint3D &point: frame){
+        if (k_index_frame <= 1) {
+            for (pandar_ros::WPoint3D& point : frame) {
                 point.raw_point.timestamp = frame_info.end_timestamp;
             }
         }
@@ -235,25 +235,123 @@ namespace ct_icp {
             }
         }
 
-        for (pandar_ros::WPoint3D &point: frame){
+        for (pandar_ros::WPoint3D& point : frame) {
             TransformPoint(options_.motion_compensation, point, tr_frame.begin_pose, tr_frame.end_pose);
         }
 
-        for (pandar_ros::WPoint3D &point: frame){
+        for (pandar_ros::WPoint3D& point : frame) {
             point.frame_index = frame_info.frame_id;
         }
         return frame;
     }
 
-    Odometry::RegistrationSummary Odometry::TryRegister(std::vector<pandar_ros::WPoint3D> &frame,
-            Odometry::FrameInfo frame_info, ct_icp::CTICPOptions& options,
-            Odometry::RegistrationSummary& registration_summary,
-            double sample_voxel_size) {
+    Odometry::RegistrationSummary Odometry::TryRegister(std::vector<pandar_ros::WPoint3D>& frame,
+        Odometry::FrameInfo frame_info, ct_icp::CTICPOptions& options,
+        Odometry::RegistrationSummary& registration_summary,
+        double sample_voxel_size) {
+
+        std::vector<pandar_ros::WPoint3D> keypoints;
+        grid_sampling(frame, keypoints, sample_voxel_size);
+
+        const int k_index_frame = frame_info.registered_fid;
+        int num_keypoints = (int)keypoints.size();
+        registration_summary.sample_size = num_keypoints;
+
+        const TrajectoryFrame* prev_frame = k_index_frame <= 1 ? nullptr : &trajectory_[k_index_frame - 1];
+        {
+            if (k_index_frame < options_.init_num_frames) {
+                options.voxel_neighborhood = std::max(2, options.voxel_neighborhood);
+                options.threshold_voxel_occupancy = 1;
+                options.num_iters_icp = std::max(options.num_iters_icp, 15);
+            }
+
+            // IterateOverCallbacks(OdometryCallback::BEFORE_ITERATION,
+            //                      frame, &keypoints);
+
+            // CT ICP
+            ICPSummary icp_summary;
+            CT_ICP_Registration registration;
+            registration.Options() = options;
+            icp_summary = registration.Register(voxel_map_, keypoints, registration_summary.frame, prev_frame);
+
+            registration_summary.success - icp_summary.success;
+            registration_summary.number_of_residuals = icp_summary.num_residuals_used;
+
+            if (!registration_summary.success) {
+                registration_summary.success = false;
                 return registration_summary;
+            }
+
+            // update frame
+            slam::Pose pose_begin = registration_summary.frame.begin_pose;
+            slam::Pose pose_end = registration_summary.frame.end_pose;
+            for (pandar_ros::WPoint3D& point : frame) {
+                TransformPoint(options_.motion_compensation, point, pose_begin, pose_end);
+            }
+            registration_summary.keypoints = keypoints;
+        }
+        // IterateOverCallbacks(OdometryCallback::ITERATION_COMPLETED,
+        //                      frame, &keypoints, nullptr);
+
+        return registration_summary;
     }
 
     bool Odometry::AssessRegistration(const std::vector<pandar_ros::WPoint3D>& points, Odometry::RegistrationSummary& summary) const {
-        return true;
+        bool success = summary.success;
+        if (summary.robust_level == 0 &&
+            (summary.relative_orientation > options_.robust_threshold_relative_orientation ||
+                summary.ego_orientation > options_.robust_threshold_ego_orientation)) {
+            if (summary.robust_level < options_.robust_num_attempts_when_rotation) {
+                summary.error_message = "Large rotations require at a robust_level of at least 1 (got:" +
+                    std::to_string(summary.robust_level) + ").";
+                return false;
+            }
+        }
+        if (summary.relative_distance > options_.robust_relative_trans_threshold) {
+            summary.error_message = "The relative distance is too important";
+            return false;
+        }
+        // Only do neighbor assessment if enough motion
+        bool do_neighbor_assessment = summary.distance_correction > 0.1;
+        do_neighbor_assessment |= summary.relative_distance > options_.robust_neighborhood_min_dist;
+        do_neighbor_assessment |= summary.relative_orientation > options_.robust_neighborhood_min_orientation;
+
+        if (do_neighbor_assessment && registered_frames_ > options_.init_num_frames) {
+            if (options_.robust_registration) {
+                const double kSizeVoxelMap = options_.ct_icp_options.size_voxel_map;
+                Voxel voxel;
+                double ratio_empty_voxel = 0;
+                double ratio_half_full_voxel = 0;
+
+                for (auto &point: points) {
+                    voxel = Voxel::Coordinates(point.w_point, kSizeVoxelMap);
+                    if (voxel_map_.find(voxel) == voxel_map_.end())
+                        ratio_empty_voxel += 1;
+                    if (voxel_map_.find(voxel) != voxel_map_.end() &&
+                        voxel_map_.at(voxel).NumPoints() > options_.max_num_points_in_voxel / 2) {
+                        // Only count voxels which have at least
+                        ratio_half_full_voxel += 1;
+                    }
+                }
+
+                ratio_empty_voxel /= points.size();
+                ratio_half_full_voxel /= points.size();
+
+                if (ratio_half_full_voxel < options_.robust_full_voxel_threshold ||
+                    ratio_empty_voxel > options_.robust_empty_voxel_threshold) {
+                    success = false;
+                    if (ratio_empty_voxel > options_.robust_empty_voxel_threshold)
+                        summary.error_message = "[Odometry::AssessRegistration] Ratio of empty voxels " +
+                                                std::to_string(ratio_empty_voxel) + "above threshold.";
+                    else
+                        summary.error_message = "[Odometry::AssessRegistration] Ratio of half full voxels " +
+                                                std::to_string(ratio_half_full_voxel) + "below threshold.";
+
+                }
+            }
+        }
+
+        return success;
     }
 
     Odometry::RegistrationSummary Odometry::DoRegister(const pcl::PointCloud<pandar_ros::Point>& const_frame, FrameInfo frame_info) {
@@ -273,7 +371,7 @@ namespace ct_icp {
         if (is_logging) {
             std::cout << "Number of points in subsampled frame: " << frame.size() << " out of " << const_frame.size() << std::endl;
         }
-        if (k_index_frame > 0){
+        if (k_index_frame > 0) {
             Eigen::Vector3d t_diff = trajectory_[k_index_frame].end_pose.pose.tr - trajectory_[k_index_frame].begin_pose.pose.tr;
             if (is_logging) {
                 std::cout << "Initial ego-motion distance: " << t_diff.norm() << std::endl;
@@ -283,7 +381,7 @@ namespace ct_icp {
         const ct_icp::TrajectoryFrame initial_estimate = trajectory_.back();
         RegistrationSummary summary;
         summary.frame = initial_estimate;
-        ct_icp::TrajectoryFrame &current_frame = summary.frame;
+        ct_icp::TrajectoryFrame& current_frame = summary.frame;
         ct_icp::TrajectoryFrame previous_frame = initial_estimate;
 
         if (k_index_frame > 0) {
@@ -297,15 +395,15 @@ namespace ct_icp {
                 previous_frame = current_frame;
                 current_frame = initial_estimate;
                 ct_options.voxel_neighborhood = std::min(++ct_options.voxel_neighborhood,
-                                                             options_.robust_max_voxel_neighborhood);
+                    options_.robust_max_voxel_neighborhood);
                 ct_options.ls_max_num_iters += 30;
                 if (ct_options.max_num_residuals > 0)
                     ct_options.max_num_residuals = ct_options.max_num_residuals * 2;
                 ct_options.num_iters_icp = std::min(ct_options.num_iters_icp + 20, 50);
                 ct_options.threshold_orientation_norm = std::max(
-                        ct_options.threshold_orientation_norm / 10, 1.e-5);
+                    ct_options.threshold_orientation_norm / 10, 1.e-5);
                 ct_options.threshold_translation_norm = std::max(
-                        ct_options.threshold_orientation_norm / 10, 1.e-4);
+                    ct_options.threshold_orientation_norm / 10, 1.e-4);
                 sample_voxel_size = std::max(sample_voxel_size / 1.5, min_voxel_size);
                 ct_options.ls_sigma *= 1.2;
                 ct_options.max_dist_to_plane_ct_icp *= 1.5;
@@ -322,16 +420,16 @@ namespace ct_icp {
                 TryRegister(frame, frame_info, ct_options, summary, sample_voxel_size); // TODO: implement TryRegister
                 auto end_ct_icp = std::chrono::steady_clock::now();
                 std::chrono::duration<double> elapsed_ct_icp = end_ct_icp - start_time;
-                if (is_logging){
+                if (is_logging) {
                     std::cout << "CT-ICP took " << elapsed_ct_icp.count() * 1000 << " ms." << std::endl;
-                    std::cout << "No. of keypoints extracted: " << summary.sample_size << 
+                    std::cout << "No. of keypoints extracted: " << summary.sample_size <<
                         " / Actual no. of residuals: " << summary.number_of_residuals << std::endl;
                 }
 
-                if (k_index_frame > 0){
+                if (k_index_frame > 0) {
                     summary.distance_correction = (current_frame.begin_pose.pose.tr - trajectory_[k_index_frame - 1].end_pose.pose.tr).norm();
                     auto norm = ((trajectory_[k_index_frame - 1].EndQuat().normalized().toRotationMatrix() *
-                                current_frame.EndQuat().normalized().toRotationMatrix().transpose()).trace() - 1.) / 2.;
+                        current_frame.EndQuat().normalized().toRotationMatrix().transpose()).trace() - 1.) / 2.;
                     if (std::abs(norm) > 1. + 1.e-8) {
                         std::cout << "Not a rotation matrix " << norm << std::endl;
                     }
@@ -348,17 +446,18 @@ namespace ct_icp {
                     if (options_.robust_registration && summary.number_of_attempts < options_.robust_num_attempts) {
                         if (is_logging)
                             std::cout << "Registration Attempt no" << summary.number_of_attempts
-                                    << " failed with message: "
-                                    << summary.error_message << std::endl;
+                            << " failed with message: "
+                            << summary.error_message << std::endl;
                         double trans_distance = previous_frame.TranslationDistance(summary.frame);
                         double rot_distance = previous_frame.RotationDistance(summary.frame);
                         if (is_logging)
                             std::cout << "Distance to previous trans : " << trans_distance <<
-                                    " rot distance " << rot_distance << std::endl;
+                            " rot distance " << rot_distance << std::endl;
                         increase_robustness();
                         summary.robust_level++;
                         summary.number_of_attempts++;
-                    } else {
+                    }
+                    else {
                         good_enough = true;
                     }
                 }
@@ -402,27 +501,27 @@ namespace ct_icp {
 
         auto end_time = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = end_time - start_time;
-        if (is_logging){
+        if (is_logging) {
             std::cout << "Elapsed time: " << elapsed_seconds.count() * 1000 << " ms." << std::endl;
         }
 
         summary.corrected_points = frame;
         summary.all_corrected_points.resize(const_frame.size());
         auto raw_points = const_frame.points;
-        
+
         for (int i = 0; i < summary.all_corrected_points.size(); i++) {
             summary.all_corrected_points[i] = raw_points[i];
             summary.all_corrected_points[i].frame_index = frame_info.frame_id;
         }
 
-        const slam::Pose &beg_pose = summary.frame.begin_pose;
-        const slam::Pose &end_pose = summary.frame.end_pose;
+        const slam::Pose& beg_pose = summary.frame.begin_pose;
+        const slam::Pose& end_pose = summary.frame.end_pose;
 
-        for (pandar_ros::WPoint3D &point: summary.corrected_points) {
+        for (pandar_ros::WPoint3D& point : summary.corrected_points) {
             point.w_point = beg_pose.ContinuousTransform(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z), end_pose, point.raw_point.timestamp);
         }
-        
-        for (pandar_ros::WPoint3D &point: summary.all_corrected_points) {
+
+        for (pandar_ros::WPoint3D& point : summary.all_corrected_points) {
             point.w_point = beg_pose.ContinuousTransform(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z), end_pose, point.raw_point.timestamp);
         }
 
