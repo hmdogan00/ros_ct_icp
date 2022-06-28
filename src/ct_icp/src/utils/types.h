@@ -29,7 +29,7 @@ namespace pandar_ros {
         std::uint16_t ring;
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-            Point& operator=(const Point& other) {
+        Point& operator=(const Point& other) {
             x = other.x;
             y = other.y;
             z = other.z;

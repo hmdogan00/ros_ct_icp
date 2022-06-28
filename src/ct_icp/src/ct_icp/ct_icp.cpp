@@ -575,10 +575,6 @@ namespace ct_icp {
                 ICPSummary summary;
                 summary.success = false;
                 summary.num_residuals_used = number_of_residuals;
-                summary.error_log = ss_out.str();
-                if (options.debug_print) {
-                    std::cout << summary.error_log;
-                }
                 return summary;
             }
 

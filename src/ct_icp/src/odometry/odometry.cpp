@@ -256,7 +256,7 @@ namespace ct_icp {
         const int k_index_frame = frame_info.registered_fid;
         int num_keypoints = (int)keypoints.size();
         registration_summary.sample_size = num_keypoints;
-
+        
         const TrajectoryFrame* prev_frame = k_index_frame <= 1 ? nullptr : &trajectory_[k_index_frame - 1];
         {
             if (k_index_frame < options_.init_num_frames) {
@@ -265,16 +265,15 @@ namespace ct_icp {
                 options.num_iters_icp = std::max(options.num_iters_icp, 15);
             }
 
-            // IterateOverCallbacks(OdometryCallback::BEFORE_ITERATION,
-            //                      frame, &keypoints);
-
             // CT ICP
             ICPSummary icp_summary;
             CT_ICP_Registration registration;
             registration.Options() = options;
+
             icp_summary = registration.Register(voxel_map_, keypoints, registration_summary.frame, prev_frame);
 
-            registration_summary.success - icp_summary.success;
+
+            registration_summary.success = icp_summary.success;
             registration_summary.number_of_residuals = icp_summary.num_residuals_used;
 
             if (!registration_summary.success) {
@@ -282,16 +281,17 @@ namespace ct_icp {
                 return registration_summary;
             }
 
+
             // update frame
             slam::Pose pose_begin = registration_summary.frame.begin_pose;
             slam::Pose pose_end = registration_summary.frame.end_pose;
             for (pandar_ros::WPoint3D& point : frame) {
                 TransformPoint(options_.motion_compensation, point, pose_begin, pose_end);
             }
+
             registration_summary.keypoints = keypoints;
+
         }
-        // IterateOverCallbacks(OdometryCallback::ITERATION_COMPLETED,
-        //                      frame, &keypoints, nullptr);
 
         return registration_summary;
     }
@@ -411,13 +411,15 @@ namespace ct_icp {
 
             summary.robust_level = 0;
             do {
+    
                 if (summary.robust_level < next_robust_level_) {
                     summary.robust_level++;
                     increase_robustness();
                     continue;
                 }
                 auto start_ct_icp = std::chrono::steady_clock::now();
-                TryRegister(frame, frame_info, ct_options, summary, sample_voxel_size); // TODO: implement TryRegister
+    
+                TryRegister(frame, frame_info, ct_options, summary, sample_voxel_size);
                 auto end_ct_icp = std::chrono::steady_clock::now();
                 std::chrono::duration<double> elapsed_ct_icp = end_ct_icp - start_time;
                 if (is_logging) {
@@ -425,6 +427,7 @@ namespace ct_icp {
                     std::cout << "No. of keypoints extracted: " << summary.sample_size <<
                         " / Actual no. of residuals: " << summary.number_of_residuals << std::endl;
                 }
+    
 
                 if (k_index_frame > 0) {
                     summary.distance_correction = (current_frame.begin_pose.pose.tr - trajectory_[k_index_frame - 1].end_pose.pose.tr).norm();
@@ -437,6 +440,7 @@ namespace ct_icp {
                     summary.relative_orientation = AngularDistance(trajectory_[k_index_frame - 1].end_pose.pose, current_frame.end_pose.pose);
                     summary.ego_orientation = summary.frame.EgoAngularDistance();
                 }
+    
                 summary.relative_distance = (current_frame.EndTr() - current_frame.BeginTr()).norm();
                 good_enough = AssessRegistration(frame, summary); // TODO: implement AssessRegistration
 
@@ -528,7 +532,24 @@ namespace ct_icp {
         if (add_points) {
             AddPointsToMap(voxel_map_, summary.corrected_points, kSizeVoxelMap, kMaxNumPointsInVoxel, kMinDistPoints);
         }
+        IterateOverCallbacks(OdometryCallback::FINISHED_REGISTRATION,
+                             frame, nullptr, &summary);
         return summary;
     }
+
+    void Odometry::RegisterCallback(Odometry::OdometryCallback::EVENT event, Odometry::OdometryCallback &callback) {
+        callbacks_[event].push_back(&callback);
+    }
+
+    void Odometry::IterateOverCallbacks(Odometry::OdometryCallback::EVENT event,
+                                        const std::vector<pandar_ros::WPoint3D> &current_frame,
+                                        const std::vector<pandar_ros::WPoint3D> *keypoints,
+                                        const RegistrationSummary *summary) {
+        if (callbacks_.find(event) != callbacks_.end()) {
+            for (auto &callback: callbacks_[event])
+                CHECK(callback->Run(*this, current_frame, keypoints)) << "Callback returned false";
+        }
+    }
+
 }
 #endif

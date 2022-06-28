@@ -128,6 +128,23 @@ namespace ct_icp {
 
         };
 
+        struct OdometryCallback {
+
+            enum EVENT {
+                BEFORE_ITERATION, //< Runs the callback before the iteration
+                ITERATION_COMPLETED, //< Run the callback once an iteration has been completed
+                FINISHED_REGISTRATION //< Runs the callback after the end of the iterations
+            };
+
+            // @brief   Execution method of the Callback with the instance who called the callback as argument
+            virtual bool Run(
+                    const Odometry &odometry,
+                    const std::vector<pandar_ros::WPoint3D> &current_frame,
+                    const std::vector<pandar_ros::WPoint3D> *keypoints = nullptr,
+                    const RegistrationSummary *summary = nullptr) = 0;
+
+        };
+
         explicit Odometry(const OdometryOptions& options);
 
         // Registers a new Frame to the Map
@@ -140,14 +157,14 @@ namespace ct_icp {
         // Returns the currently registered trajectory
         [[nodiscard]] std::vector<TrajectoryFrame> Trajectory() const;
 
-        // Returns the Aggregated PointCloud of the Local Map
-        [[nodiscard]] ArrayVector3d GetLocalMap() const;
-
         // Num Points in the Map
         // Note: This requires a traversal of the whole map which is in O(n)
         [[nodiscard]] size_t MapSize() const;
 
+        void RegisterCallback(OdometryCallback::EVENT event, OdometryCallback &callback);
+
         private:
+        std::map<OdometryCallback::EVENT, std::vector<OdometryCallback *>> callbacks_;
         std::vector<TrajectoryFrame> trajectory_;
         VoxelHashMap voxel_map_;
         int registered_frames_ = 0;
@@ -157,6 +174,11 @@ namespace ct_icp {
         OdometryOptions options_;
         std::ostream* log_out_ = nullptr;
         std::unique_ptr<std::ofstream> log_file_ = nullptr;
+
+        void IterateOverCallbacks(OdometryCallback::EVENT event,
+                                  const std::vector<pandar_ros::WPoint3D> &current_frame,
+                                  const std::vector<pandar_ros::WPoint3D> *keypoints = nullptr,
+                                  const RegistrationSummary *summary = nullptr);
 
         // Initialize the Frame
         std::vector<pandar_ros::WPoint3D> InitializeFrame(const pcl::PointCloud<pandar_ros::Point>& const_frame,
@@ -180,6 +202,7 @@ namespace ct_icp {
         // Returns false if it fails
         bool AssessRegistration(const std::vector<pandar_ros::WPoint3D>& points, RegistrationSummary& summary) const;
 
+        friend class OdometryCallback;
     };
 
 } // namespace ct_icp

@@ -113,7 +113,6 @@ namespace ct_icp {
     struct ICPSummary {
         bool success = false; // Whether the registration succeeded
         int num_residuals_used = 0;
-        std::string error_log;
     };
 
     class CT_ICP_Registration {
