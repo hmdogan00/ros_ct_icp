@@ -44,25 +44,33 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 1
-      Cell Size: 1000
-      Class: rviz/Grid
-      Color: 160; 160; 164
-      Enabled: false
-      Line Style:
-        Line Width: 0.029999999329447746
-        Value: Lines
-      Name: Grid
-      Normal Cell Count: 0
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Plane: XY
-      Plane Cell Count: 40
-      Reference Frame: <Fixed Frame>
-      Value: false
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 238; 238; 236
+      Color Transformer: Intensity
+      Decay Time: 0
       Enabled: true
-      Name: mapping
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 238; 238; 236
+      Name: surround
+      Position Transformer: XYZ
+      Queue Size: 1
+      Selectable: false
+      Size (Pixels): 3
+      Size (m): 0.05000000074505806
+      Style: Points
+      Topic: /PointCloud
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
     - Class: rviz/Group
       Displays:
         - Angle Tolerance: 0.009999999776482582
@@ -201,7 +209,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: odometry
+    Fixed Frame: Odometry
     Frame Rate: 10
   Name: root
   Tools:
