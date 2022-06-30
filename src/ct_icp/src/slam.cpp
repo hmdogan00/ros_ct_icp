@@ -11,8 +11,8 @@ int init, motion, dist, ls, solver, weight;
 int frame_id = 0;
 std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
-const std::string main_frame_id = "/odometry";
-const std::string child_frame_id = "/body";
+const std::string main_frame_id = "Odometry";
+const std::string child_frame_id = "body";
 ros::Publisher* pub;
 
 struct Options {
@@ -137,7 +137,7 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     q.setY(odom.pose.pose.orientation.y);
     q.setZ(odom.pose.pose.orientation.z);
     transform.setRotation( q );
-    br.sendTransform( tf::StampedTransform( transform, odom.header.stamp, "camera_init", "body" ) );
+    br.sendTransform( tf::StampedTransform( transform, odom.header.stamp, odom.header.frame_id, odom.child_frame_id ) );
 }
 
 int main(int argc, char** argv) {
@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
     ros::Publisher odom_publisher = nh.advertise<nav_msgs::Odometry>
             ("/Odometry", 100000);
     pub = &odom_publisher;
-    std::cout << "qw qx qy qz tx ty tz\n" << std::endl;
+    //std::cout << "qw qx qy qz tx ty tz\n" << std::endl;
     while (ros::ok()) {
         ros::spinOnce();
     }
