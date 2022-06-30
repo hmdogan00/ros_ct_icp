@@ -5,6 +5,7 @@
 #include "odometry/odometry.h"
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
+#include <pcl/common/transforms.h>
 
 int init, motion, dist, ls, solver, weight;
 
@@ -13,7 +14,8 @@ std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
 const std::string main_frame_id = "Odometry";
 const std::string child_frame_id = "body";
-ros::Publisher* pub;
+ros::Publisher* odomPublisher;
+ros::Publisher* pclPublisher;
 
 struct Options {
     ct_icp::OdometryOptions odometry_options;
@@ -124,8 +126,17 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     odom.pose.pose.position.y = summary.frame.BeginTr().y();
     odom.pose.pose.position.z = summary.frame.BeginTr().z();
 
-    pub->publish(odom);
+    odomPublisher->publish(odom);
 
+    // publish point cloud
+    sensor_msgs::PointCloud2 output;
+    pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc(new pcl::PointCloud<pandar_ros::Point>());
+    pcl::transformPointCloud(pcl_pc2, *pcl_pc, summary.frame.begin_pose.Matrix());
+    pcl::toROSMsg(*pcl_pc, output);
+    output.header.stamp = input->header.stamp;
+    output.header.frame_id = main_frame_id;
+    pclPublisher->publish(output);
+    
     static tf::TransformBroadcaster br;
     tf::Transform                   transform;
     tf::Quaternion                  q;
@@ -152,7 +163,10 @@ int main(int argc, char** argv) {
     ros::Subscriber sub_pcl = nh.subscribe(options.lidar_topic, 200000, pcl_cb);
     ros::Publisher odom_publisher = nh.advertise<nav_msgs::Odometry>
         ("/Odometry", 100000);
-    pub = &odom_publisher;
+    ros::Publisher pcl_publisher = nh.advertise<sensor_msgs::PointCloud2>
+        ("/PointCloud", 100000);
+    odomPublisher = &odom_publisher;
+    pclPublisher = &pcl_publisher;
     while (ros::ok()) {
         ros::spinOnce();
     }
