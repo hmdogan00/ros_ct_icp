@@ -106,23 +106,23 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
         double timestamp = std::fmod(pcl_pc2.points[i].timestamp, 100);
         timestamp_vec.push_back(timestamp);
     }
-
+    auto start = std::chrono::steady_clock::now();
     ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
-    // slam::SE3 p = summary.frame.begin_pose.pose;
-    // std::cout << p.quat.w() << " " << p.quat.x() << " " << p.quat.y() << " " << p.quat.z() << " " << p.tr.x() << " " << p.tr.y() << " " << p.tr.z() << std::endl;
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Registration time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     frame_id++;
     nav_msgs::Odometry odom;
     odom.header.stamp = input->header.stamp;
     odom.header.frame_id = main_frame_id;
     odom.child_frame_id = child_frame_id;
 
-    odom.pose.pose.orientation.x = summary.frame.begin_pose.pose.quat.x();
-    odom.pose.pose.orientation.y = summary.frame.begin_pose.pose.quat.y();
-    odom.pose.pose.orientation.z = summary.frame.begin_pose.pose.quat.z();
-    odom.pose.pose.orientation.w = summary.frame.begin_pose.pose.quat.w();
-    odom.pose.pose.position.x = summary.frame.begin_pose.pose.tr.x();
-    odom.pose.pose.position.y = summary.frame.begin_pose.pose.tr.y();
-    odom.pose.pose.position.z = summary.frame.begin_pose.pose.tr.z();
+    odom.pose.pose.orientation.x = summary.frame.BeginQuat().x();
+    odom.pose.pose.orientation.y = summary.frame.BeginQuat().y();
+    odom.pose.pose.orientation.z = summary.frame.BeginQuat().z();
+    odom.pose.pose.orientation.w = summary.frame.BeginQuat().w();
+    odom.pose.pose.position.x = summary.frame.BeginTr().x();
+    odom.pose.pose.position.y = summary.frame.BeginTr().y();
+    odom.pose.pose.position.z = summary.frame.BeginTr().z();
 
     pub->publish(odom);
 
@@ -130,14 +130,14 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     tf::Transform                   transform;
     tf::Quaternion                  q;
     transform.setOrigin(tf::Vector3(odom.pose.pose.position.x, \
-                                    odom.pose.pose.position.y, \
-                                    odom.pose.pose.position.z));
+        odom.pose.pose.position.y, \
+        odom.pose.pose.position.z));
     q.setW(odom.pose.pose.orientation.w);
     q.setX(odom.pose.pose.orientation.x);
     q.setY(odom.pose.pose.orientation.y);
     q.setZ(odom.pose.pose.orientation.z);
-    transform.setRotation( q );
-    br.sendTransform( tf::StampedTransform( transform, odom.header.stamp, odom.header.frame_id, odom.child_frame_id ) );
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, odom.header.stamp, odom.header.frame_id, odom.child_frame_id));
 }
 
 int main(int argc, char** argv) {
@@ -151,9 +151,8 @@ int main(int argc, char** argv) {
 
     ros::Subscriber sub_pcl = nh.subscribe(options.lidar_topic, 200000, pcl_cb);
     ros::Publisher odom_publisher = nh.advertise<nav_msgs::Odometry>
-            ("/Odometry", 100000);
+        ("/Odometry", 100000);
     pub = &odom_publisher;
-    //std::cout << "qw qx qy qz tx ty tz\n" << std::endl;
     while (ros::ok()) {
         ros::spinOnce();
     }
