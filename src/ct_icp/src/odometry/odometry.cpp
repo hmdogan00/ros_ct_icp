@@ -532,23 +532,7 @@ namespace ct_icp {
         if (add_points) {
             AddPointsToMap(voxel_map_, summary.corrected_points, kSizeVoxelMap, kMaxNumPointsInVoxel, kMinDistPoints);
         }
-        IterateOverCallbacks(OdometryCallback::FINISHED_REGISTRATION,
-                             frame, nullptr, &summary);
         return summary;
-    }
-
-    void Odometry::RegisterCallback(Odometry::OdometryCallback::EVENT event, Odometry::OdometryCallback &callback) {
-        callbacks_[event].push_back(&callback);
-    }
-
-    void Odometry::IterateOverCallbacks(Odometry::OdometryCallback::EVENT event,
-                                        const std::vector<pandar_ros::WPoint3D> &current_frame,
-                                        const std::vector<pandar_ros::WPoint3D> *keypoints,
-                                        const RegistrationSummary *summary) {
-        if (callbacks_.find(event) != callbacks_.end()) {
-            for (auto &callback: callbacks_[event])
-                CHECK(callback->Run(*this, current_frame, keypoints)) << "Callback returned false";
-        }
     }
 
 }

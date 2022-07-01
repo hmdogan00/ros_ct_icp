@@ -59,7 +59,7 @@ Visualization Manager:
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 238; 238; 236
-      Name: surround
+      Name: PointCloud
       Position Transformer: XYZ
       Queue Size: 1
       Selectable: false
@@ -67,6 +67,34 @@ Visualization Manager:
       Size (m): 0.05000000074505806
       Style: Points
       Topic: /PointCloud
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 238; 238; 236
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 238; 238; 236
+      Name: PointCloud
+      Position Transformer: XYZ
+      Queue Size: 1
+      Selectable: false
+      Size (Pixels): 3
+      Size (m): 0.05000000074505806
+      Style: Points
+      Topic: /Cloud
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -209,7 +237,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: Odometry
+    Fixed Frame: main
     Frame Rate: 10
   Name: root
   Tools:

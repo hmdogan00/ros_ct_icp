@@ -135,6 +135,14 @@ namespace ct_icp {
                                         std::vector<double> &timestamps,
                                         TrajectoryFrame &t_frame,
                                         const TrajectoryFrame *const previous_frame = nullptr);
+            
+            
+            ICPSummary DoRegisterGN(const VoxelHashMap &voxel_map,
+                                        std::vector<Eigen::Vector3d> &raw_keypts,
+                                        std::vector<Eigen::Vector3d> &world_keypts,
+                                        std::vector<double> &timestamps,
+                                        TrajectoryFrame &t_frame,
+                                        const TrajectoryFrame *const previous_frame = nullptr);
 
             CTICPOptions options_;
     };

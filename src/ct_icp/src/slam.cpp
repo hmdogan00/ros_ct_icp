@@ -12,10 +12,11 @@ int init, motion, dist, ls, solver, weight;
 int frame_id = 0;
 std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
-const std::string main_frame_id = "Odometry";
+const std::string main_frame_id = "main";
 const std::string child_frame_id = "body";
 ros::Publisher* odomPublisher;
 ros::Publisher* pclPublisher;
+ros::Publisher* cloudPublisher;
 
 struct Options {
     ct_icp::OdometryOptions odometry_options;
@@ -136,6 +137,23 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     output.header.stamp = input->header.stamp;
     output.header.frame_id = main_frame_id;
     pclPublisher->publish(output);
+
+    // publish corrected points
+    sensor_msgs::PointCloud2 output_corrected;
+    pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected(new pcl::PointCloud<pandar_ros::Point>());
+    for (auto p: summary.keypoints) {
+        pandar_ros::Point p_ros;
+        p_ros.x = p.w_point.x();
+        p_ros.y = p.w_point.y();
+        p_ros.z = p.w_point.z();
+        pcl_pc_corrected->push_back(p_ros);
+    }
+    pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected2(new pcl::PointCloud<pandar_ros::Point>());
+    pcl::transformPointCloud(*pcl_pc_corrected, *pcl_pc_corrected2, summary.frame.begin_pose.Matrix());
+    pcl::toROSMsg(*pcl_pc_corrected2, output_corrected);
+    output_corrected.header.stamp = input->header.stamp;
+    output_corrected.header.frame_id = main_frame_id;
+    cloudPublisher->publish(output_corrected);
     
     static tf::TransformBroadcaster br;
     tf::Transform                   transform;
@@ -165,8 +183,11 @@ int main(int argc, char** argv) {
         ("/Odometry", 100000);
     ros::Publisher pcl_publisher = nh.advertise<sensor_msgs::PointCloud2>
         ("/PointCloud", 100000);
+    ros::Publisher cloud_publisher = nh.advertise<sensor_msgs::PointCloud2>
+        ("/Cloud", 100000);
     odomPublisher = &odom_publisher;
     pclPublisher = &pcl_publisher;
+    cloudPublisher = &cloud_publisher;
     while (ros::ok()) {
         ros::spinOnce();
     }

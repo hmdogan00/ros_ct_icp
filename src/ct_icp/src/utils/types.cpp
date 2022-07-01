@@ -105,8 +105,8 @@ namespace slam {
     }
 
     Pose Pose::InterpolatePose(const Pose& other_pose, double timestamp, int new_dest_frame_id) const {
-        // CHECK(dest_timestamp <= timestamp && timestamp <= other_pose.dest_timestamp)
-        //     << "The timestamp cannot be interpolated between the two poses" << std::endl;
+        CHECK(dest_timestamp <= timestamp && timestamp <= other_pose.dest_timestamp)
+            << "The timestamp cannot be interpolated between the two poses" << std::endl;
         CHECK(other_pose.ref_frame_id == ref_frame_id)
             << "Invalid operation: Cannot interpolate two frames not expressed in the same reference frame."
             << "ref_frame_id: " << ref_frame_id <<
