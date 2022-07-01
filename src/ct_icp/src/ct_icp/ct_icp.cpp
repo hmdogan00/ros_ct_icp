@@ -872,7 +872,10 @@ namespace ct_icp {
         for (int i = 0; i < keypoints.size(); i++){
             raw_points.push_back(Eigen::Vector3d(keypoints[i].raw_point.x, keypoints[i].raw_point.y, keypoints[i].raw_point.z));
             world_points.push_back(keypoints[i].w_point);
-            timestamps.push_back(keypoints[i].raw_point.timestamp);
+            double timestamp = keypoints[i].raw_point.timestamp;
+            // expect a number like 43.123456789
+            if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
+            timestamps.push_back(timestamp);
         }
         //return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
         return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
@@ -889,7 +892,10 @@ namespace ct_icp {
         for (pandar_ros::WPoint3D point : keypoints.points) {
             raw_points.push_back(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z));
             world_points.push_back(point.w_point);
-            timestamps.push_back(point.raw_point.timestamp);
+            double timestamp = point.raw_point.timestamp;
+            // expect a number like 43.123456789
+            if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
+            timestamps.push_back(timestamp);
         }
         //return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
         return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
