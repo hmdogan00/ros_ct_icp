@@ -877,8 +877,10 @@ namespace ct_icp {
             if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
             timestamps.push_back(timestamp);
         }
-        //return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
-        return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
+        if (Options().solver == 1)
+            return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
+        else
+            return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
     }
 
     /* -------------------------------------------------------------------------------------------------------------- */
@@ -897,7 +899,9 @@ namespace ct_icp {
             if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
             timestamps.push_back(timestamp);
         }
-        //return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
-        return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
+        if (Options().solver == 1)
+            return DoRegisterCeres(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
+        else
+            return DoRegisterGN(voxel_map, raw_points, world_points, timestamps, trajectory_frame, previous_frame);
     }
 }
