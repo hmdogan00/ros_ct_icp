@@ -1,14 +1,19 @@
 
 #include <mutex>
 #include <thread>
+#include <fstream>
 #include <nav_msgs/Odometry.h>
 #include "odometry/odometry.h"
 #include <tf/transform_datatypes.h>
 #include <tf/transform_broadcaster.h>
 #include <pcl/common/transforms.h>
+#include <ros/package.h>
 
 int init, motion, dist, ls, solver, weight;
 
+bool is_writing = false;
+static const std::string path = ros::package::getPath("ct_icp");
+static std::ofstream file;
 int frame_id = 0;
 std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
@@ -17,14 +22,16 @@ const std::string child_frame_id = "body";
 ros::Publisher* odomPublisher;
 ros::Publisher* pclPublisher;
 ros::Publisher* cloudPublisher;
+Eigen::Quaterniond q_last = Eigen::Quaterniond::Identity();
+Eigen::Vector3d t_last = Eigen::Vector3d::Zero();
 
 struct Options {
     ct_icp::OdometryOptions odometry_options;
     std::string lidar_topic = "/center/pandar";
+    bool write_to_file = false;
     int max_num_threads = 1; // The maximum number of threads running in parallel the Dataset acquisition
     bool suspend_on_failure = false; // Whether to suspend the execution once an error is detected
     bool save_trajectory = true; // whether to save the trajectory
-    std::string output_dir = "./outputs"; // The output path (relative or absolute) to save the pointclouds
     std::string sequence; // The desired sequence (only applicable if `all_sequences` is false)
     int start_index = 0; // The start index of the sequence (only applicable if `all_sequences` is false)
     int max_frames = -1; // The maximum number of frames to register (if -1 all frames in the Dataset are registered)
@@ -33,10 +40,10 @@ struct Options {
 Options get_options(ros::NodeHandle nh) {
     Options options;
     nh.param<int>("/max_num_threads", options.max_num_threads, 1);
-    nh.param<std::string>("/output_dir", options.output_dir, ".outputs");
     nh.param<std::string>("/lidar_topic", options.lidar_topic, "/center/pandar");
     nh.param<bool>("/save_trajectory", options.save_trajectory, true);
     nh.param<bool>("/suspend_on_failure", options.suspend_on_failure, false);
+    nh.param<bool>("/write_to_file", options.write_to_file, false);
 
     nh.param<bool>("/odometry_options/debug_print", options.odometry_options.debug_print, true);
     nh.param<double>("/odometry_options/distance_error_threshold", options.odometry_options.distance_error_threshold, 5.0);
@@ -114,21 +121,40 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     auto end = std::chrono::steady_clock::now();
     std::cout << "Registration time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     frame_id++;
+
+    Eigen::Matrix4d new_transformation_matrix = summary.frame.begin_pose.Matrix();
+    
+    Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
+    prev_transformation_matrix.block<3,3>(0,0) = q_last.matrix();
+    prev_transformation_matrix.block<3,1>(0,3) = t_last;
+    
+    Eigen::Matrix4d odometry_matrix = prev_transformation_matrix * new_transformation_matrix;
+
+    q_last = Eigen::Quaterniond(odometry_matrix.block<3,3>(0,0));
+    t_last = odometry_matrix.block<3,1>(0,3);
+
     nav_msgs::Odometry odom;
     odom.header.stamp = input->header.stamp;
     odom.header.frame_id = main_frame_id;
     odom.child_frame_id = child_frame_id;
 
-    odom.pose.pose.orientation.x = summary.frame.BeginQuat().x();
-    odom.pose.pose.orientation.y = summary.frame.BeginQuat().y();
-    odom.pose.pose.orientation.z = summary.frame.BeginQuat().z();
-    odom.pose.pose.orientation.w = summary.frame.BeginQuat().w();
-    odom.pose.pose.position.x = summary.frame.BeginTr().x();
-    odom.pose.pose.position.y = summary.frame.BeginTr().y();
-    odom.pose.pose.position.z = summary.frame.BeginTr().z();
+    odom.pose.pose.orientation.x = q_last.x();
+    odom.pose.pose.orientation.y = q_last.y();
+    odom.pose.pose.orientation.z = q_last.z();
+    odom.pose.pose.orientation.w = q_last.w();
+    odom.pose.pose.position.x = t_last.x();
+    odom.pose.pose.position.y = t_last.y();
+    odom.pose.pose.position.z = t_last.z();
+
+    if (is_writing && file.is_open()){
+        file << input->header.stamp << " " << t_last.x() << " " << t_last.y() << " " << t_last.z() << " ";
+        file << q_last.x() << " " << q_last.y() << " " << q_last.z() << " " << q_last.w() << std::endl;
+    }
 
     odomPublisher->publish(odom);
 
+    // std::cout << summary.frame.BeginTr().x() << " " << summary.frame.BeginTr().y() << " " << summary.frame.BeginTr().z() << " ";
+    // std::cout << summary.frame.BeginQuat().x() << " " << summary.frame.BeginQuat().y() << " " << summary.frame.BeginQuat().z() << " " << summary.frame.BeginQuat().w() << std::endl;
     // publish point cloud
     sensor_msgs::PointCloud2 output;
     pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc(new pcl::PointCloud<pandar_ros::Point>());
@@ -138,22 +164,22 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     output.header.frame_id = main_frame_id;
     pclPublisher->publish(output);
 
-    // publish corrected points
-    sensor_msgs::PointCloud2 output_corrected;
-    pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected(new pcl::PointCloud<pandar_ros::Point>());
-    for (auto p: summary.keypoints) {
-        pandar_ros::Point p_ros;
-        p_ros.x = p.w_point.x();
-        p_ros.y = p.w_point.y();
-        p_ros.z = p.w_point.z();
-        pcl_pc_corrected->push_back(p_ros);
-    }
-    pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected2(new pcl::PointCloud<pandar_ros::Point>());
-    pcl::transformPointCloud(*pcl_pc_corrected, *pcl_pc_corrected2, summary.frame.begin_pose.Matrix());
-    pcl::toROSMsg(*pcl_pc_corrected2, output_corrected);
-    output_corrected.header.stamp = input->header.stamp;
-    output_corrected.header.frame_id = main_frame_id;
-    cloudPublisher->publish(output_corrected);
+    // // publish corrected points
+    // sensor_msgs::PointCloud2 output_corrected;
+    // pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected(new pcl::PointCloud<pandar_ros::Point>());
+    // for (auto p: summary.keypoints) {
+    //     pandar_ros::Point p_ros;
+    //     p_ros.x = p.w_point.x();
+    //     p_ros.y = p.w_point.y();
+    //     p_ros.z = p.w_point.z();
+    //     pcl_pc_corrected->push_back(p_ros);
+    // }
+    // pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc_corrected2(new pcl::PointCloud<pandar_ros::Point>());
+    // //pcl::transformPointCloud(*pcl_pc_corrected, *pcl_pc_corrected2, summary.frame.begin_pose.Matrix());
+    // pcl::toROSMsg(*pcl_pc_corrected2, output_corrected);
+    // output_corrected.header.stamp = input->header.stamp;
+    // output_corrected.header.frame_id = main_frame_id;
+    // cloudPublisher->publish(output_corrected);
     
     static tf::TransformBroadcaster br;
     tf::Transform                   transform;
@@ -177,6 +203,11 @@ int main(int argc, char** argv) {
     Options options = get_options(nh);
 
     odometry_ptr = std::make_unique<ct_icp::Odometry>(options.odometry_options);
+    if (options.write_to_file) {
+        is_writing = true;
+        file.open(path + "/files/" + "ct_icp.txt");
+        file << "# time x y z qx qy qz qw" << std::endl;
+    }
 
     ros::Subscriber sub_pcl = nh.subscribe(options.lidar_topic, 200000, pcl_cb);
     ros::Publisher odom_publisher = nh.advertise<nav_msgs::Odometry>
