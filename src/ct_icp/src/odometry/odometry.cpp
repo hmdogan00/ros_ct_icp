@@ -490,7 +490,46 @@ namespace ct_icp {
         bool add_points = true;
 
         if (options_.robust_registration) {
-            std::cout << "Robust registration is not implemented!" << std::endl;
+            // Communicate whether we suspect an error due to too many attempts
+            suspect_registration_error_ = summary.number_of_attempts >= options_.robust_num_attempts;
+            if (is_logging) {
+                std::cout << "[Robust Registration] "
+                        << (suspect_registration_error_ ? "Suspect Registration due to a large number of attempts."
+                                                        : "")
+                        << "Might be failing. Consecutive failures: " << robust_num_consecutive_failures_ << std::endl;
+                std::cout << "[Robust Registration] The rotation ego motion is "
+                        << summary.ego_orientation << " (deg)/ " << " relative orientation "
+                        << summary.relative_orientation << " (deg) " << std::endl;
+            }
+
+            if (summary.ego_orientation > options_.robust_threshold_ego_orientation ||
+                summary.relative_orientation > options_.robust_threshold_relative_orientation) {
+                if (is_logging)
+                    std::cout << "[Robust Registration] Change in orientation too important. "
+                               "Points will not be added." << std::endl;
+                add_points = false;
+            }
+
+            if (suspect_registration_error_) {
+                if (robust_num_consecutive_failures_ > 5) {
+                    if (is_logging)
+                        std::cout << "Adding points despite failure" << std::endl;
+                }
+                add_points |= (robust_num_consecutive_failures_ > 5);
+            }
+
+            next_robust_level_ = add_points ? options_.robust_minimal_level : options_.robust_minimal_level + 1;
+            if (!summary.success)
+                next_robust_level_ = options_.robust_minimal_level + 2;
+            else {
+                if (summary.relative_orientation > options_.robust_threshold_relative_orientation ||
+                    summary.ego_orientation > options_.robust_threshold_ego_orientation) {
+                    next_robust_level_ = options_.robust_minimal_level + 1;
+                }
+                if (summary.number_of_attempts > 1) {
+                    next_robust_level_ = options_.robust_minimal_level + 1;
+                }
+            }
         }
 
         const double k_max_distance = options_.max_distance;
