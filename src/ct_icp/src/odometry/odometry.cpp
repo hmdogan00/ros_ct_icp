@@ -549,13 +549,13 @@ namespace ct_icp {
         }
 
         summary.corrected_points = frame;
-        summary.all_corrected_points.resize(const_frame.size());
+        // summary.all_corrected_points.resize(const_frame.size());
         auto raw_points = const_frame.points;
 
-        for (int i = 0; i < summary.all_corrected_points.size(); i++) {
-            summary.all_corrected_points[i] = raw_points[i];
-            summary.all_corrected_points[i].frame_index = frame_info.frame_id;
-        }
+        // for (int i = 0; i < summary.all_corrected_points.size(); i++) {
+        //     summary.all_corrected_points[i] = raw_points[i];
+        //     summary.all_corrected_points[i].frame_index = frame_info.frame_id;
+        // }
 
         const slam::Pose& beg_pose = summary.frame.begin_pose;
         const slam::Pose& end_pose = summary.frame.end_pose;
@@ -564,9 +564,9 @@ namespace ct_icp {
             point.w_point = beg_pose.ContinuousTransform(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z), end_pose, point.raw_point.timestamp);
         }
 
-        for (pandar_ros::WPoint3D& point : summary.all_corrected_points) {
-            point.w_point = beg_pose.ContinuousTransform(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z), end_pose, point.raw_point.timestamp);
-        }
+        // for (pandar_ros::WPoint3D& point : summary.all_corrected_points) {
+        //     point.w_point = beg_pose.ContinuousTransform(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z), end_pose, point.raw_point.timestamp);
+        // }
 
         if (add_points) {
             AddPointsToMap(voxel_map_, summary.corrected_points, kSizeVoxelMap, kMaxNumPointsInVoxel, kMinDistPoints);
