@@ -22,6 +22,7 @@ const std::string child_frame_id = "body";
 ros::Publisher* odomPublisher;
 ros::Publisher* pclPublisher;
 ros::Publisher* cloudPublisher;
+
 Eigen::Quaterniond q_last = Eigen::Quaterniond::Identity();
 Eigen::Vector3d t_last = Eigen::Vector3d::Zero();
 
@@ -118,21 +119,22 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     }
     auto start = std::chrono::steady_clock::now();
     ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    auto end = std::chrono::steady_clock::now();
     
     if (summary.success)
-        ROS_INFO("Registration is a success.");
+        std::cout << "Registration is a success:" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     else {
         ROS_INFO("Registration is a failure");
         ros::shutdown();
     }
-    auto end = std::chrono::steady_clock::now();
-    std::cout << "Registration time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     frame_id++;
 
-    Eigen::Matrix4d new_transformation_matrix = summary.frame.begin_pose.Matrix();
+    Eigen::Matrix4d new_begin = summary.frame.begin_pose.Matrix();
+    Eigen::Matrix4d new_end = summary.frame.end_pose.Matrix();
+    Eigen::Matrix4d new_transformation_matrix = new_begin * new_end;
     
     Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
-    prev_transformation_matrix.block<3,3>(0,0) = q_last.matrix();
+    prev_transformation_matrix.block<3,3>(0,0) = q_last.normalized().toRotationMatrix();
     prev_transformation_matrix.block<3,1>(0,3) = t_last;
     
     Eigen::Matrix4d odometry_matrix = prev_transformation_matrix * new_transformation_matrix;
@@ -160,12 +162,15 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
 
     odomPublisher->publish(odom);
 
-    // std::cout << summary.frame.BeginTr().x() << " " << summary.frame.BeginTr().y() << " " << summary.frame.BeginTr().z() << " ";
-    // std::cout << summary.frame.BeginQuat().x() << " " << summary.frame.BeginQuat().y() << " " << summary.frame.BeginQuat().z() << " " << summary.frame.BeginQuat().w() << std::endl;
+    std::cout << summary.frame.BeginTr().x() << " " << summary.frame.BeginTr().y() << " " << summary.frame.BeginTr().z() << " ";
+    std::cout << summary.frame.BeginQuat().x() << " " << summary.frame.BeginQuat().y() << " " << summary.frame.BeginQuat().z() << " " << summary.frame.BeginQuat().w() << std::endl;
+    std::cout << t_last.x() << " " << t_last.y() << " " << t_last.z() << " ";
+    std::cout << q_last.x() << " " << q_last.y() << " " << q_last.z() << " " << q_last.w() << std::endl;
+
     // publish point cloud
     sensor_msgs::PointCloud2 output;
     pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc(new pcl::PointCloud<pandar_ros::Point>());
-    pcl::transformPointCloud(pcl_pc2, *pcl_pc, summary.frame.begin_pose.Matrix());
+    pcl::transformPointCloud(pcl_pc2, *pcl_pc, odometry_matrix);
     pcl::toROSMsg(*pcl_pc, output);
     output.header.stamp = input->header.stamp;
     output.header.frame_id = main_frame_id;

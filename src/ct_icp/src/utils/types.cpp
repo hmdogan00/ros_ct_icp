@@ -124,8 +124,8 @@ namespace slam {
 
     Eigen::Matrix<double, 4, 4> Pose::Matrix() const {
         Eigen::Matrix<double, 4, 4> Tr = Eigen::Matrix<double, 4, 4>::Identity();
-        Tr.template block<3, 3>(0, 0) = pose.quat.normalized().toRotationMatrix();
-        Tr.template block<3, 1>(0, 3) = pose.tr;
+        Tr.block<3, 3>(0, 0) = pose.quat.normalized().toRotationMatrix();
+        Tr.block<3, 1>(0, 3) = pose.tr;
         return Tr;
     }
 

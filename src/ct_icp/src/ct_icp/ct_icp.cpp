@@ -501,7 +501,7 @@ namespace ct_icp {
                 Eigen::Vector3d world_point = world_kpts[k];
 
                 // Neighborhood search
-                std::vector<Voxel> voxels; // next line may be problematic
+                std::vector<Voxel> voxels;
                 auto vector_neighbors = search_neighbors(voxels_map, world_point,
                                                          nb_voxels_visited, options.size_voxel_map,
                                                          options.max_number_neighbors, kThresholdCapacity,
@@ -750,7 +750,7 @@ namespace ct_icp {
 
                     auto step4 = std::chrono::steady_clock::now();
                     std::chrono::duration<double> _elapsed_A = step4 - step3;
-                    elapsed_search_neighbors += _elapsed_A.count() * 1000.0;
+                    elapsed_A_construction += _elapsed_A.count() * 1000.0;
                 }
             }
 
@@ -853,7 +853,7 @@ namespace ct_icp {
             std::cout << "Elapsed A Construction: " << elapsed_A_construction << std::endl;
             std::cout << "Elapsed Select closest: " << elapsed_select_closest_neighbors << std::endl;
             std::cout << "Elapsed Solve: " << elapsed_solve << std::endl;
-            std::cout << "Elapsed Solve: " << elapsed_update << std::endl;
+            std::cout << "Elapsed Update: " << elapsed_update << std::endl;
             std::cout << "Number iterations CT-ICP : " << options.num_iters_icp << std::endl;
         }
         summary.success = true;
