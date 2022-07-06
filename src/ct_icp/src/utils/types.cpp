@@ -105,7 +105,7 @@ namespace slam {
     }
 
     Pose Pose::InterpolatePose(const Pose& other_pose, double timestamp, int new_dest_frame_id) const {
-        if (timestamp > other_pose.dest_timestamp) timestamp = std::fmod(timestamp, 100);
+        // if (timestamp > other_pose.dest_timestamp) timestamp = std::fmod(timestamp, 10) / 10;
         CHECK(dest_timestamp <= timestamp && timestamp <= other_pose.dest_timestamp)
             << "The timestamp cannot be interpolated between the two poses" << std::endl;
         CHECK(other_pose.ref_frame_id == ref_frame_id)

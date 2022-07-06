@@ -157,7 +157,6 @@ namespace ct_icp {
             }
         }
         auto size = priority_queue.size();
-        //std::cout << size << std::endl;
         ArrayVector3d closest_neighbors(size);
         if (voxels != nullptr) {
             voxels->resize(size);
@@ -168,7 +167,6 @@ namespace ct_icp {
                 (*voxels)[size - 1 - i] = std::get<2>(priority_queue.top());
             priority_queue.pop();
         }
-
 
         return closest_neighbors;
     }
@@ -407,6 +405,7 @@ namespace ct_icp {
                                                 std::vector<double> &timestamps,
                                                 TrajectoryFrame &frame_to_optimize,
                                                 const TrajectoryFrame *const _previous_frame) {
+        CHECK(raw_kpts.size() == world_kpts.size() && raw_kpts.size() == timestamps.size());
         size_t num_points = raw_kpts.size();
         auto &options = Options();
 
@@ -455,9 +454,11 @@ namespace ct_icp {
                     auto interpolated_pose = frame_to_optimize.begin_pose.InterpolatePose(
                             frame_to_optimize.end_pose, timestamp);
                     world_point_proxy = interpolated_pose * raw_kpts[i];
+                    // world_point_proxy = interpolated_pose * (raw_kpts[i].operator Eigen::Vector3d());
                 } else {
                     auto world_point_proxy = world_kpts[i];
                     world_point_proxy = frame_to_optimize.end_pose * raw_kpts[i];
+                    // world_point_proxy = interpolated_pose * (raw_kpts[i].operator Eigen::Vector3d());
                 }
             }
         };
@@ -500,7 +501,7 @@ namespace ct_icp {
                 Eigen::Vector3d world_point = world_kpts[k];
 
                 // Neighborhood search
-                std::vector<Voxel> voxels;
+                std::vector<Voxel> voxels; // next line may be problematic
                 auto vector_neighbors = search_neighbors(voxels_map, world_point,
                                                          nb_voxels_visited, options.size_voxel_map,
                                                          options.max_number_neighbors, kThresholdCapacity,
@@ -569,9 +570,8 @@ namespace ct_icp {
                                           &begin_quat.x());
             }
             if (number_of_residuals < options.min_number_neighbors) {
-                std::stringstream ss_out;
-                ss_out << "[CT_ICP] Error : not enough keypoints selected in ct-icp !" << std::endl;
-                ss_out << "[CT_ICP] number_of_residuals : " << number_of_residuals << std::endl;
+                std::cout << "[CT_ICP] Error : not enough keypoints selected in ct-icp !" << std::endl;
+                std::cout << "[CT_ICP] number_of_residuals : " << number_of_residuals << std::endl;
                 ICPSummary summary;
                 summary.success = false;
                 summary.num_residuals_used = number_of_residuals;
@@ -678,7 +678,6 @@ namespace ct_icp {
                 elapsed_search_neighbors += _elapsed_search_neighbrs.count() * 1000.0;
 
                 if (vector_neighbors.size() < k_min_num_neighbors) {
-                    //std::cout << "[CT-ICP] Error: Not enough neighbors found for point " << p_idx << std::endl;
                     continue;
                 }
 
@@ -873,8 +872,8 @@ namespace ct_icp {
             raw_points.push_back(Eigen::Vector3d(keypoints[i].raw_point.x, keypoints[i].raw_point.y, keypoints[i].raw_point.z));
             world_points.push_back(keypoints[i].w_point);
             double timestamp = keypoints[i].raw_point.timestamp;
-            // expect a number like 43.123456789
-            if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
+            // expect a number like .43123456789
+            // if ( timestamp > 10 ) timestamp = std::fmod(timestamp, 10) / 10;
             timestamps.push_back(timestamp);
         }
         if (Options().solver == 1)
@@ -895,8 +894,8 @@ namespace ct_icp {
             raw_points.push_back(Eigen::Vector3d(point.raw_point.x, point.raw_point.y, point.raw_point.z));
             world_points.push_back(point.w_point);
             double timestamp = point.raw_point.timestamp;
-            // expect a number like 43.123456789
-            if ( timestamp > 1e6 ) timestamp = std::fmod(timestamp, 100);
+            // expect a number like .43123456789
+            if ( timestamp > 10 ) timestamp = std::fmod(timestamp, 10) / 10;
             timestamps.push_back(timestamp);
         }
         if (Options().solver == 1)

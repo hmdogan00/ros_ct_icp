@@ -110,14 +110,21 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     pcl::fromROSMsg(*input, pcl_pc2);
 
     // add timestamp fields to double vector
-    auto stamp = pcl_pc2.header.stamp;
+    auto stamp = input->header.stamp;
     std::vector<double> timestamp_vec;
     for (int i = 0; i < pcl_pc2.size(); i++) {
-        double timestamp = std::fmod(pcl_pc2.points[i].timestamp, 100);
-        timestamp_vec.push_back(timestamp);
+        // double timestamp = std::fmod(pcl_pc2.points[i].timestamp, 10) / 10;
+        timestamp_vec.push_back(pcl_pc2.points[i].timestamp);
     }
     auto start = std::chrono::steady_clock::now();
     ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    
+    if (summary.success)
+        ROS_INFO("Registration is a success.");
+    else {
+        ROS_INFO("Registration is a failure");
+        ros::shutdown();
+    }
     auto end = std::chrono::steady_clock::now();
     std::cout << "Registration time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     frame_id++;

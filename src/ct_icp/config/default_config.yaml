@@ -2,7 +2,7 @@ lidar_topic: /center/pandar
 max_num_threads:  8
 save_trajectory: true
 suspend_on_failure: false
-write_to_file: true
+write_to_file: false
 
 # ODOMETRY OPTIONS ----
 odometry_options:
