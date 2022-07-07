@@ -42,8 +42,6 @@ namespace ct_icp {
         // To be considered in the neighbor search, a voxel must have at least threshold_voxel_occupancy points
         int threshold_voxel_occupancy = 1;
 
-        int init_num_frames = 20; // The number of frames defining the initialization of the map
-
         double size_voxel_map = 1.0; //Max Voxel : -32767 to 32767 then 32km map for SIZE_VOXEL_MAP = 1m
 
         int num_iters_icp = 5; // The Maximum number of ICP iterations performed
@@ -55,7 +53,7 @@ namespace ct_icp {
         double power_planarity = 2.0; // The power of planarity defined in the weighting scheme
 
         // Whether to estimate the normal of the key point or the closest neighbor
-        bool estimate_normal_from_neighborhood = true;
+        bool estimate_normal_from_neighborhood = false;
 
         int max_number_neighbors = 20;
 

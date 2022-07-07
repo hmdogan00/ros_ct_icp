@@ -895,7 +895,7 @@ namespace ct_icp {
             world_points.push_back(point.w_point);
             double timestamp = point.raw_point.timestamp;
             // expect a number like .43123456789
-            if ( timestamp > 10 ) timestamp = std::fmod(timestamp, 10) / 10;
+            // if ( timestamp > 10 ) timestamp = std::fmod(timestamp, 10) / 10;
             timestamps.push_back(timestamp);
         }
         if (Options().solver == 1)

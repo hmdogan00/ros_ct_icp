@@ -129,15 +129,13 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     }
     frame_id++;
 
-    Eigen::Matrix4d new_begin = summary.frame.begin_pose.Matrix();
-    Eigen::Matrix4d new_end = summary.frame.end_pose.Matrix();
-    Eigen::Matrix4d new_transformation_matrix = new_begin * new_end;
+    Eigen::Matrix4d new_begin = summary.frame.end_pose.Matrix();
     
     Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
     prev_transformation_matrix.block<3,3>(0,0) = q_last.normalized().toRotationMatrix();
     prev_transformation_matrix.block<3,1>(0,3) = t_last;
     
-    Eigen::Matrix4d odometry_matrix = prev_transformation_matrix * new_transformation_matrix;
+    Eigen::Matrix4d odometry_matrix = prev_transformation_matrix * new_begin;
 
     q_last = Eigen::Quaterniond(odometry_matrix.block<3,3>(0,0));
     t_last = odometry_matrix.block<3,1>(0,3);
@@ -162,10 +160,10 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
 
     odomPublisher->publish(odom);
 
-    std::cout << summary.frame.BeginTr().x() << " " << summary.frame.BeginTr().y() << " " << summary.frame.BeginTr().z() << " ";
-    std::cout << summary.frame.BeginQuat().x() << " " << summary.frame.BeginQuat().y() << " " << summary.frame.BeginQuat().z() << " " << summary.frame.BeginQuat().w() << std::endl;
-    std::cout << t_last.x() << " " << t_last.y() << " " << t_last.z() << " ";
-    std::cout << q_last.x() << " " << q_last.y() << " " << q_last.z() << " " << q_last.w() << std::endl;
+    // std::cout << summary.frame.BeginTr().x() << " " << summary.frame.BeginTr().y() << " " << summary.frame.BeginTr().z() << " ";
+    // std::cout << summary.frame.BeginQuat().x() << " " << summary.frame.BeginQuat().y() << " " << summary.frame.BeginQuat().z() << " " << summary.frame.BeginQuat().w() << std::endl;
+    // std::cout << t_last.x() << " " << t_last.y() << " " << t_last.z() << " ";
+    // std::cout << q_last.x() << " " << q_last.y() << " " << q_last.z() << " " << q_last.w() << std::endl;
 
     // publish point cloud
     sensor_msgs::PointCloud2 output;
@@ -196,13 +194,13 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     static tf::TransformBroadcaster br;
     tf::Transform                   transform;
     tf::Quaternion                  q;
-    transform.setOrigin(tf::Vector3(odom.pose.pose.position.x, \
-        odom.pose.pose.position.y, \
-        odom.pose.pose.position.z));
-    q.setW(odom.pose.pose.orientation.w);
-    q.setX(odom.pose.pose.orientation.x);
-    q.setY(odom.pose.pose.orientation.y);
-    q.setZ(odom.pose.pose.orientation.z);
+    transform.setOrigin(tf::Vector3(t_last.x(), \
+        t_last.y(), \
+        t_last.z()));
+    q.setW(q_last.w());
+    q.setX(q_last.x());
+    q.setY(q_last.y());
+    q.setZ(q_last.z());
     transform.setRotation(q);
     br.sendTransform(tf::StampedTransform(transform, odom.header.stamp, odom.header.frame_id, odom.child_frame_id));
 }
