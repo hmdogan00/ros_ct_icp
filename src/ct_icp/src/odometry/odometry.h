@@ -90,11 +90,6 @@ namespace ct_icp {
 
     class Odometry {
         public:
-        struct FrameInfo {
-            int registered_fid = -1; // The index of the new frame (since the initial insertion of the frame)
-            int frame_id = -1; // The frame index
-            double begin_timestamp = -1., end_timestamp = -1.;
-        };
         // The Output of a registration, including metrics,
         struct RegistrationSummary {
 
@@ -128,27 +123,12 @@ namespace ct_icp {
 
         };
 
-        struct OdometryCallback {
-
-            enum EVENT {
-                BEFORE_ITERATION, //< Runs the callback before the iteration
-                ITERATION_COMPLETED, //< Run the callback once an iteration has been completed
-                FINISHED_REGISTRATION //< Runs the callback after the end of the iterations
-            };
-
-            // @brief   Execution method of the Callback with the instance who called the callback as argument
-            virtual bool Run(
-                    const Odometry &odometry,
-                    const std::vector<pandar_ros::WPoint3D> &current_frame,
-                    const std::vector<pandar_ros::WPoint3D> *keypoints = nullptr,
-                    const RegistrationSummary *summary = nullptr) = 0;
-
-        };
-
         explicit Odometry(const OdometryOptions& options);
 
+        explicit Odometry(const OdometryOptions *options) : Odometry(*options) {}
+
         // Registers a new Frame to the Map
-        RegistrationSummary RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame, const std::vector<double>& timestamp_vector);
+        RegistrationSummary RegisterFrame(const pcl::PointCloud<pandar_ros::Point>& frame);
 
         // Registers a new Frame to the Map with an initial estimate
         RegistrationSummary RegisterFrameWithEstimate(const pcl::PointCloud<pandar_ros::Point>& frame,
@@ -157,14 +137,14 @@ namespace ct_icp {
         // Returns the currently registered trajectory
         [[nodiscard]] std::vector<TrajectoryFrame> Trajectory() const;
 
+        // Returns the Aggregated PointCloud of the Local Map
+        [[nodiscard]] ArrayVector3d GetLocalMap() const;
+
         // Num Points in the Map
         // Note: This requires a traversal of the whole map which is in O(n)
         [[nodiscard]] size_t MapSize() const;
 
-        void RegisterCallback(OdometryCallback::EVENT event, OdometryCallback &callback);
-
         private:
-        std::map<OdometryCallback::EVENT, std::vector<OdometryCallback *>> callbacks_;
         std::vector<TrajectoryFrame> trajectory_;
         VoxelHashMap voxel_map_;
         int registered_frames_ = 0;
@@ -175,34 +155,26 @@ namespace ct_icp {
         std::ostream* log_out_ = nullptr;
         std::unique_ptr<std::ofstream> log_file_ = nullptr;
 
-        void IterateOverCallbacks(OdometryCallback::EVENT event,
-                                  const std::vector<pandar_ros::WPoint3D> &current_frame,
-                                  const std::vector<pandar_ros::WPoint3D> *keypoints = nullptr,
-                                  const RegistrationSummary *summary = nullptr);
-
         // Initialize the Frame
-        std::vector<pandar_ros::WPoint3D> InitializeFrame(const pcl::PointCloud<pandar_ros::Point>& const_frame,
-            FrameInfo frame_info);
+        std::vector<pandar_ros::WPoint3D> InitializeFrame(const pcl::PointCloud<pandar_ros::Point>& const_frame, int frame_index);
 
         // Registers a frame after the motion was initialized
         // When the Robust Registration profile is activated, it can call TryRegister
         // Multiple times changing the options in order to increase the chance of registration
-        RegistrationSummary DoRegister(const pcl::PointCloud<pandar_ros::Point>& const_frame, FrameInfo frame_info);
+        RegistrationSummary DoRegister(const pcl::PointCloud<pandar_ros::Point>& const_frame, int frame_index);
 
         // Tries to register a frame given a set of options
         RegistrationSummary TryRegister(std::vector<pandar_ros::WPoint3D> &frame,
-            FrameInfo frame_info, CTICPOptions& options,
+            int frame_index, CTICPOptions& options,
             RegistrationSummary& registration_summary,
             double sample_voxel_size);
 
         // Insert a New Trajectory Frame, and initializes the motion for this new frame
-        void InitializeMotion(FrameInfo frame_info, const TrajectoryFrame* initial_estimate = nullptr);
+        int InitializeMotion(const TrajectoryFrame* initial_estimate = nullptr);
 
         // Try to insert Points to the map
         // Returns false if it fails
         bool AssessRegistration(const std::vector<pandar_ros::WPoint3D>& points, RegistrationSummary& summary) const;
-
-        friend class OdometryCallback;
     };
 
 } // namespace ct_icp

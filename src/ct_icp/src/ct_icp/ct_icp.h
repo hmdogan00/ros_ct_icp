@@ -112,37 +112,13 @@ namespace ct_icp {
         bool success = false; // Whether the registration succeeded
         int num_residuals_used = 0;
     };
-
-    class CT_ICP_Registration {
-        public:
-            CTICPOptions &Options() { return options_; }
-
-            ICPSummary Register(const VoxelHashMap &voxel_map,
-                                std::vector<pandar_ros::WPoint3D> &keypoints,
-                                TrajectoryFrame &t_frame,
-                                const TrajectoryFrame *const previous_frame = nullptr);
-            
-            ICPSummary Register(const VoxelHashMap &voxel_map,
-                                pcl::PointCloud<pandar_ros::WPoint3D> &keypoints,
-                                TrajectoryFrame &t_frame,
-                                const TrajectoryFrame *const previous_frame = nullptr);
-        private:
-            ICPSummary DoRegisterCeres(const VoxelHashMap &voxel_map,
-                                        std::vector<Eigen::Vector3d> &raw_keypts,
-                                        std::vector<Eigen::Vector3d> &world_keypts,
-                                        std::vector<double> &timestamps,
-                                        TrajectoryFrame &t_frame,
-                                        const TrajectoryFrame *const previous_frame = nullptr);
-            
-            
-            ICPSummary DoRegisterGN(const VoxelHashMap &voxel_map,
-                                        std::vector<Eigen::Vector3d> &raw_keypts,
-                                        std::vector<Eigen::Vector3d> &world_keypts,
-                                        std::vector<double> &timestamps,
-                                        TrajectoryFrame &t_frame,
-                                        const TrajectoryFrame *const previous_frame = nullptr);
-
-            CTICPOptions options_;
-    };
+    
+    ICPSummary CT_ICP_CERES(const CTICPOptions &options,
+                    const VoxelHashMap &voxels_map, std::vector<pandar_ros::WPoint3D> &keypoints,
+                    std::vector<TrajectoryFrame> &trajectory, int index_frame);
+    
+    ICPSummary CT_ICP_GN(const CTICPOptions &options,
+                    const VoxelHashMap &voxels_map, std::vector<pandar_ros::WPoint3D> &keypoints,
+                    std::vector<TrajectoryFrame> &trajectory, int index_frame);
 }
 #endif

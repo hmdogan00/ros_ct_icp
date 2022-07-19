@@ -65,7 +65,7 @@ Visualization Manager:
       Selectable: false
       Size (Pixels): 3
       Size (m): 0.05000000074505806
-      Style: Points
+      Style: Flat Squares
       Topic: /PointCloud
       Unreliable: false
       Use Fixed Frame: true
@@ -237,7 +237,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: main
+    Fixed Frame: map
     Frame Rate: 10
   Name: root
   Tools:

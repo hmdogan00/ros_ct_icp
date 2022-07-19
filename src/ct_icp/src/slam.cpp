@@ -4,8 +4,8 @@
 #include <fstream>
 #include <nav_msgs/Odometry.h>
 #include "odometry/odometry.h"
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_eigen/tf2_eigen.h>
 #include <pcl/common/transforms.h>
 #include <ros/package.h>
 
@@ -17,8 +17,10 @@ static std::ofstream file;
 int frame_id = 0;
 std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
-const std::string main_frame_id = "main";
+const std::string main_frame_id = "map";
 const std::string child_frame_id = "body";
+std::unique_ptr<tf2_ros::TransformBroadcaster> tfBroadcasterPtr;
+
 ros::Publisher* odomPublisher;
 ros::Publisher* pclPublisher;
 ros::Publisher* cloudPublisher;
@@ -112,13 +114,8 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
 
     // add timestamp fields to double vector
     auto stamp = input->header.stamp;
-    std::vector<double> timestamp_vec;
-    for (int i = 0; i < pcl_pc2.size(); i++) {
-        // double timestamp = std::fmod(pcl_pc2.points[i].timestamp, 10) / 10;
-        timestamp_vec.push_back(pcl_pc2.points[i].timestamp);
-    }
     auto start = std::chrono::steady_clock::now();
-    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2, timestamp_vec);
+    ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2);
     auto end = std::chrono::steady_clock::now();
     
     if (summary.success)
@@ -129,7 +126,10 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     }
     frame_id++;
 
-    Eigen::Matrix4d new_begin = summary.frame.end_pose.Matrix();
+    Eigen::Matrix4d new_begin = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
+    new_begin.block<3, 3>(0, 0) = summary.frame.begin_R;
+    new_begin.block<3, 1>(0, 3) = summary.frame.begin_t;
+
     
     Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
     prev_transformation_matrix.block<3,3>(0,0) = q_last.normalized().toRotationMatrix();
@@ -191,18 +191,14 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     // output_corrected.header.frame_id = main_frame_id;
     // cloudPublisher->publish(output_corrected);
     
-    static tf::TransformBroadcaster br;
-    tf::Transform                   transform;
-    tf::Quaternion                  q;
-    transform.setOrigin(tf::Vector3(t_last.x(), \
-        t_last.y(), \
-        t_last.z()));
-    q.setW(q_last.w());
-    q.setX(q_last.x());
-    q.setY(q_last.y());
-    q.setZ(q_last.z());
-    transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, odom.header.stamp, odom.header.frame_id, odom.child_frame_id));
+    geometry_msgs::TransformStamped tf_gt;
+    Eigen::Isometry3d iso(odometry_matrix);
+    tf_gt = tf2::eigenToTransform(iso);
+    tf_gt.header.stamp.sec = stamp.sec;
+    tf_gt.header.stamp.nsec = stamp.nsec;
+    tf_gt.header.frame_id = main_frame_id;
+    tf_gt.child_frame_id = child_frame_id;
+    tfBroadcasterPtr->sendTransform(tf_gt);
 }
 
 int main(int argc, char** argv) {
@@ -226,6 +222,7 @@ int main(int argc, char** argv) {
         ("/PointCloud", 100000);
     ros::Publisher cloud_publisher = nh.advertise<sensor_msgs::PointCloud2>
         ("/Cloud", 100000);
+    tfBroadcasterPtr = std::make_unique<tf2_ros::TransformBroadcaster>();
     odomPublisher = &odom_publisher;
     pclPublisher = &pcl_publisher;
     cloudPublisher = &cloud_publisher;

@@ -44,6 +44,7 @@ namespace pandar_ros {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         Point raw_point;
         Eigen::Vector3d w_point;
+        double alpha_timestamp = 0.0;
         int frame_index = -1;
 
         WPoint3D() = default;
@@ -52,6 +53,7 @@ namespace pandar_ros {
             raw_point = other;
             w_point = Eigen::Vector3d(raw_point.x, raw_point.y, raw_point.z);
             frame_index = -1;
+            alpha_timestamp = 0.0;
             return *this;
         }
     };
@@ -194,28 +196,43 @@ namespace ct_icp {
 
     // A Trajectory Frame
     struct TrajectoryFrame {
-        slam::Pose begin_pose, end_pose;
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        bool success = true;
+        double begin_timestamp = 0.0;
+        double end_timestamp = 1.0;
+        Eigen::Matrix3d begin_R;
+        Eigen::Vector3d begin_t;
+        Eigen::Matrix3d end_R;
+        Eigen::Vector3d end_t;
 
         inline double EgoAngularDistance() const {
-            return slam::AngularDistance(begin_pose.pose, end_pose.pose);
+            return AngularDistance(begin_R, end_R);
         }
 
-        double TranslationDistance(const TrajectoryFrame& other) {
-            return (begin_pose.TrConstRef() - other.begin_pose.TrConstRef()).norm() +
-                (end_pose.TrConstRef() - other.end_pose.TrConstRef()).norm();
+        double TranslationDistance(const TrajectoryFrame &other) {
+            return (begin_t - other.begin_t).norm() + (end_t - other.end_t).norm();
         }
 
-        double RotationDistance(const TrajectoryFrame& other) {
-            return begin_pose.AngularDistance(other.begin_pose) + end_pose.AngularDistance(other.end_pose);
+        double RotationDistance(const TrajectoryFrame &other) {
+            return (begin_R * other.begin_R.inverse() - Eigen::Matrix3d::Identity()).norm() +
+                   (end_R * other.end_R.inverse() - Eigen::Matrix3d::Identity()).norm();
         }
-        
-        inline const Eigen::Vector3d &BeginTr() const { return begin_pose.TrConstRef(); }
 
-        inline const Eigen::Quaterniond &BeginQuat() const { return begin_pose.QuatConstRef(); }
+        TrajectoryFrame() = default;
 
-        inline const Eigen::Vector3d &EndTr() const { return end_pose.TrConstRef(); }
-
-        inline const Eigen::Quaterniond &EndQuat() const { return end_pose.QuatConstRef(); }
+        [[nodiscard]] inline Eigen::Matrix4d MidPose() const {
+            Eigen::Matrix4d mid_pose = Eigen::Matrix4d::Identity();
+            auto q_begin = Eigen::Quaterniond(begin_R);
+            auto q_end = Eigen::Quaterniond(end_R);
+            Eigen::Vector3d t_begin = begin_t;
+            Eigen::Vector3d t_end = end_t;
+            Eigen::Quaterniond q = q_begin.slerp(0.5, q_end);
+            q.normalize();
+            mid_pose.block<3, 3>(0, 0) = q.toRotationMatrix();
+            mid_pose.block<3, 1>(0, 3) = 0.5 * t_begin + 0.5 * t_end;
+            return mid_pose;
+        }
     };
 
 
