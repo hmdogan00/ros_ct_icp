@@ -15,6 +15,7 @@ bool is_writing = false;
 static const std::string path = ros::package::getPath("ct_icp");
 static std::ofstream file;
 int frame_id = 0;
+int init_frame_no = 0;
 std::mutex registration_mutex;
 std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
 const std::string main_frame_id = "map";
@@ -113,7 +114,6 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     pcl::fromROSMsg(*input, pcl_pc2);
 
     // add timestamp fields to double vector
-    auto stamp = input->header.stamp;
     auto start = std::chrono::steady_clock::now();
     ct_icp::Odometry::RegistrationSummary summary = odometry_ptr->RegisterFrame(pcl_pc2);
     auto end = std::chrono::steady_clock::now();
@@ -124,12 +124,8 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
         ROS_INFO("Registration is a failure");
         ros::shutdown();
     }
-    frame_id++;
 
-    Eigen::Matrix4d new_begin = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
-    new_begin.block<3, 3>(0, 0) = summary.frame.begin_R;
-    new_begin.block<3, 1>(0, 3) = summary.frame.begin_t;
-
+    Eigen::Matrix4d new_begin = summary.frame.MidPose();
     
     Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
     prev_transformation_matrix.block<3,3>(0,0) = q_last.normalized().toRotationMatrix();
@@ -140,10 +136,15 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     q_last = Eigen::Quaterniond(odometry_matrix.block<3,3>(0,0));
     t_last = odometry_matrix.block<3,1>(0,3);
 
+    q_last = Eigen::Quaterniond(new_begin.block<3,3>(0,0));
+    t_last = new_begin.block<3,1>(0,3);
+    q_last = q_last.normalized();
+
     nav_msgs::Odometry odom;
     odom.header.stamp = input->header.stamp;
     odom.header.frame_id = main_frame_id;
     odom.child_frame_id = child_frame_id;
+
 
     odom.pose.pose.orientation.x = q_last.x();
     odom.pose.pose.orientation.y = q_last.y();
@@ -168,7 +169,7 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     // publish point cloud
     sensor_msgs::PointCloud2 output;
     pcl::PointCloud<pandar_ros::Point>::Ptr pcl_pc(new pcl::PointCloud<pandar_ros::Point>());
-    pcl::transformPointCloud(pcl_pc2, *pcl_pc, odometry_matrix);
+    pcl::transformPointCloud(pcl_pc2, *pcl_pc, new_begin);
     pcl::toROSMsg(*pcl_pc, output);
     output.header.stamp = input->header.stamp;
     output.header.frame_id = main_frame_id;
@@ -190,15 +191,17 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     // output_corrected.header.stamp = input->header.stamp;
     // output_corrected.header.frame_id = main_frame_id;
     // cloudPublisher->publish(output_corrected);
-    
+
     geometry_msgs::TransformStamped tf_gt;
     Eigen::Isometry3d iso(odometry_matrix);
     tf_gt = tf2::eigenToTransform(iso);
-    tf_gt.header.stamp.sec = stamp.sec;
-    tf_gt.header.stamp.nsec = stamp.nsec;
+    tf_gt.header.stamp.sec = input->header.stamp.sec;
+    tf_gt.header.stamp.nsec = input->header.stamp.nsec;
     tf_gt.header.frame_id = main_frame_id;
     tf_gt.child_frame_id = child_frame_id;
     tfBroadcasterPtr->sendTransform(tf_gt);
+    
+    frame_id++;
 }
 
 int main(int argc, char** argv) {
@@ -207,6 +210,7 @@ int main(int argc, char** argv) {
 
     // Parameter registration
     Options options = get_options(nh);
+    init_frame_no = options.odometry_options.init_num_frames;
 
     odometry_ptr = std::make_unique<ct_icp::Odometry>(options.odometry_options);
     if (options.write_to_file) {
