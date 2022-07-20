@@ -127,15 +127,6 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
 
     Eigen::Matrix4d new_begin = summary.frame.MidPose();
     
-    Eigen::Matrix4d prev_transformation_matrix = Eigen::Matrix4d(Eigen::Matrix4d::Identity());
-    prev_transformation_matrix.block<3,3>(0,0) = q_last.normalized().toRotationMatrix();
-    prev_transformation_matrix.block<3,1>(0,3) = t_last;
-    
-    Eigen::Matrix4d odometry_matrix = prev_transformation_matrix * new_begin;
-
-    q_last = Eigen::Quaterniond(odometry_matrix.block<3,3>(0,0));
-    t_last = odometry_matrix.block<3,1>(0,3);
-
     q_last = Eigen::Quaterniond(new_begin.block<3,3>(0,0));
     t_last = new_begin.block<3,1>(0,3);
     q_last = q_last.normalized();
@@ -193,7 +184,7 @@ void pcl_cb(const sensor_msgs::PointCloud2::ConstPtr& input) {
     // cloudPublisher->publish(output_corrected);
 
     geometry_msgs::TransformStamped tf_gt;
-    Eigen::Isometry3d iso(odometry_matrix);
+    Eigen::Isometry3d iso(new_begin);
     tf_gt = tf2::eigenToTransform(iso);
     tf_gt.header.stamp.sec = input->header.stamp.sec;
     tf_gt.header.stamp.nsec = input->header.stamp.nsec;
